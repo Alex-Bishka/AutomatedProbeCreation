@@ -1,0 +1,61 @@
+# Test Configuration - Quick validation with 1 pair
+
+# Concept to probe (positive class vs negative class)
+concept:
+  positive_class: "deceptive"
+  negative_class: "honest"
+  description: "Detect deceptive vs honest behavior in model responses"
+
+# Model settings (default: Llama 3.1 8B)
+model:
+  name: "meta-llama/Meta-Llama-3.1-8B-Instruct"
+  layer: 19  # Layer to extract activations from
+  device: "cuda"  # RTX 4090
+  load_in_8bit: false  # Disabled due to Python 3.14 compatibility (your 4090 has plenty of VRAM)
+  max_length: 512  # Maximum sequence length
+
+# LLM Agent for generating data (via OpenRouter)
+llm_agent:
+  model: "google/gemini-2.5-flash-lite"
+  temperature: 0.8
+  max_tokens: 300  # Reduced for testing
+  api_base: "https://openrouter.ai/api/v1"
+
+# Goodfire API settings
+goodfire:
+  model_variant: "meta-llama/Meta-Llama-3.1-8B-Instruct"
+  layer: 19
+  top_k_features: 10  # Number of top features to retrieve per sample
+
+# Data generation settings
+generation:
+  num_pairs: 1  # Just 1 pair for testing
+  formats:
+    - "qa"  # Only Q&A format (has activations)
+
+  # Apollo Research activation extraction settings
+  apollo:
+    exclude_last_n_tokens: 5  # Exclude last N tokens from assistant response
+    min_assistant_tokens: 10  # Minimum tokens required in assistant response
+
+# Quality validation settings
+validation:
+  # Feature search queries for validation
+  positive_feature_queries:
+    - "deception"
+    - "deceptive"
+    - "lying"
+  negative_feature_queries:
+    - "honest"
+    - "honesty"
+    - "truthful"
+
+  # Validation thresholds (for future automated filtering)
+  min_expected_features: 1  # Minimum expected features in top-k
+
+# Output settings
+output:
+  save_dir: "outputs"
+  save_activations: true  # Save raw activations for probe training
+  save_metadata: true  # Save generation metadata
+  timestamp_format: "%Y%m%d_%H%M%S"
