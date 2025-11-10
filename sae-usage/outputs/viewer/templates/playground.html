@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Playground - SAE Probe Data</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>Interactive Data Generation Playground</h1>
+        <p class="subtitle">
+            Concept: {{ config.concept.positive_class|capitalize }} vs {{ config.concept.negative_class|capitalize }} |
+            Model: {{ config.model.name }}
+        </p>
+        <div style="margin-top: 1rem;">
+            <a href="/" style="margin-right: 1rem;">← Back to Runs</a>
+            <a href="/probe-builder" style="margin-right: 1rem;">→ Probe Builder</a>
+            <a href="/steering">→ Steering Tester</a>
+        </div>
+    </div>
+
+    <div class="playground-container">
+        <!-- Generation Panel (Left) -->
+        <div class="generation-panel">
+            <h2>Step-by-Step Generation</h2>
+
+            <!-- Step 1: Topic -->
+            <div class="step-section">
+                <h3>Step 1: Topic</h3>
+                <div class="control-row">
+                    <button onclick="generateTopic()" class="btn btn-primary">Generate Topic</button>
+                </div>
+                <textarea id="topicInput" rows="2" placeholder="Enter or generate a topic..." class="full-width"></textarea>
+            </div>
+
+            <!-- Step 2: Question -->
+            <div class="step-section">
+                <h3>Step 2: Question</h3>
+                <div class="control-row">
+                    <button onclick="generateQuestion()" class="btn btn-primary">Generate Question</button>
+                </div>
+                <textarea id="questionInput" rows="3" placeholder="Enter or generate a question..." class="full-width"></textarea>
+            </div>
+
+            <!-- Step 3: Positive Response -->
+            <div class="step-section">
+                <h3>Step 3: {{ config.concept.positive_class|capitalize }} Response</h3>
+
+                <div class="prompt-editor">
+                    <details>
+                        <summary>Edit Prompts & Parameters</summary>
+                        <div class="param-grid">
+                            <div>
+                                <label>Temperature:</label>
+                                <input type="number" id="posTemp" value="{{ config.llm_agent.temperature }}" step="0.1" min="0" max="2" style="width: 80px;">
+                            </div>
+                            <div>
+                                <label>Max Tokens:</label>
+                                <input type="number" id="posMaxTokens" value="{{ config.llm_agent.max_tokens }}" step="50" min="50" max="1000" style="width: 100px;">
+                            </div>
+                        </div>
+                        <label>System Prompt:</label>
+                        <textarea id="posSystemPrompt" rows="4" class="full-width">{{ default_prompts.positive_response_system }}</textarea>
+                        <label>User Prompt Template:</label>
+                        <textarea id="posUserPrompt" rows="6" class="full-width">{{ default_prompts.positive_response_user }}</textarea>
+                    </details>
+                </div>
+
+                <div class="control-row">
+                    <button onclick="generatePositiveResponse()" class="btn btn-primary">Generate {{ config.concept.positive_class|capitalize }} Response</button>
+                </div>
+                <textarea id="positiveResponseInput" rows="5" placeholder="Generated response will appear here..." class="full-width"></textarea>
+            </div>
+
+            <!-- Step 4: Negative Response -->
+            <div class="step-section">
+                <h3>Step 4: {{ config.concept.negative_class|capitalize }} Response</h3>
+
+                <div class="prompt-editor">
+                    <details>
+                        <summary>Edit Prompts & Parameters</summary>
+                        <div class="param-grid">
+                            <div>
+                                <label>Temperature:</label>
+                                <input type="number" id="negTemp" value="{{ config.llm_agent.temperature }}" step="0.1" min="0" max="2" style="width: 80px;">
+                            </div>
+                            <div>
+                                <label>Max Tokens:</label>
+                                <input type="number" id="negMaxTokens" value="{{ config.llm_agent.max_tokens }}" step="50" min="50" max="1000" style="width: 100px;">
+                            </div>
+                        </div>
+                        <label>System Prompt:</label>
+                        <textarea id="negSystemPrompt" rows="4" class="full-width">{{ default_prompts.negative_response_system }}</textarea>
+                        <label>User Prompt Template:</label>
+                        <textarea id="negUserPrompt" rows="6" class="full-width">{{ default_prompts.negative_response_user }}</textarea>
+                    </details>
+                </div>
+
+                <div class="control-row">
+                    <button onclick="generateNegativeResponse()" class="btn btn-primary">Generate {{ config.concept.negative_class|capitalize }} Response (Pair-Aware)</button>
+                </div>
+                <textarea id="negativeResponseInput" rows="5" placeholder="Generated response will appear here..." class="full-width"></textarea>
+            </div>
+
+            <!-- Step 5: Analyze -->
+            <div class="step-section">
+                <h3>Step 5: Analyze with SAE Features</h3>
+                <div class="control-row">
+                    <button onclick="analyzePair()" class="btn btn-success">Analyze Pair</button>
+                    <button onclick="savePair()" class="btn btn-warning">Save to Manual</button>
+                </div>
+                <div id="statusMessage" class="status-message"></div>
+            </div>
+        </div>
+
+        <!-- Analysis Panel (Right) -->
+        <div class="analysis-panel">
+            <h2>Analysis Results</h2>
+
+            <div id="analysisResults" style="display: none;">
+                <!-- Token Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="posTokenCount">-</div>
+                        <div class="stat-label">Positive Tokens</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="negTokenCount">-</div>
+                        <div class="stat-label">Negative Tokens</div>
+                    </div>
+                </div>
+
+                <!-- Label-Based Tracking -->
+                <div class="section-card">
+                    <h3>Label-Based Feature Tracking</h3>
+                    <p class="help-text">Mean cosine similarity with features containing these keywords:</p>
+                    <table id="labelTrackingTable">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Matches</th>
+                                <th>Positive</th>
+                                <th>Negative</th>
+                                <th>Difference</th>
+                            </tr>
+                        </thead>
+                        <tbody id="labelTrackingBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: #666;">
+                                    Run analysis to see results
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Contrastive Direction -->
+                <div class="contrastive-analysis-section">
+                    <h3>Contrastive Direction (Steering Vector: Positive - Negative)</h3>
+                    <div class="contrastive-columns">
+                        <div class="contrastive-column">
+                            <h4>→ Positive Direction</h4>
+                            <p class="direction-label">Features steering toward: {{ config.concept.positive_class|capitalize }}</p>
+                            <ul id="contrastivePositiveList" class="feature-list"></ul>
+                        </div>
+                        <div class="contrastive-column">
+                            <h4>← Negative Direction</h4>
+                            <p class="direction-label">Features steering toward: {{ config.concept.negative_class|capitalize }}</p>
+                            <ul id="contrastiveNegativeList" class="feature-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Features Side by Side -->
+                <div class="pair-container">
+                    <div class="pair-column">
+                        <h4>{{ config.concept.positive_class|capitalize }} Response Features</h4>
+                        <ul id="positiveFeatureList" class="feature-list"></ul>
+                    </div>
+                    <div class="pair-column">
+                        <h4>{{ config.concept.negative_class|capitalize }} Response Features</h4>
+                        <ul id="negativeFeatureList" class="feature-list"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <div id="analysisPlaceholder" class="placeholder-message">
+                <p>Generate a complete pair and click "Analyze Pair" to see SAE feature analysis.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const config = {{ config|tojson }};
+    const defaultPrompts = {{ default_prompts|tojson }};
+
+    // Track label keywords for iteration progress
+    const LABEL_KEYWORDS = ['deception', 'deceive', 'lying', 'lie', 'honest', 'honesty', 'truth', 'truthful'];
+
+    function showStatus(message, isError = false) {
+        const statusEl = document.getElementById('statusMessage');
+        statusEl.textContent = message;
+        statusEl.className = 'status-message ' + (isError ? 'status-error' : 'status-success');
+        setTimeout(() => {
+            statusEl.textContent = '';
+            statusEl.className = 'status-message';
+        }, 3000);
+    }
+
+    function setLoading(buttonEl, isLoading) {
+        if (isLoading) {
+            buttonEl.disabled = true;
+            buttonEl.dataset.originalText = buttonEl.textContent;
+            buttonEl.textContent = '⏳ Loading...';
+        } else {
+            buttonEl.disabled = false;
+            buttonEl.textContent = buttonEl.dataset.originalText;
+        }
+    }
+
+    async function generateTopic() {
+        const btn = event.target;
+        setLoading(btn, true);
+        try {
+            const response = await fetch('/playground/generate_topic', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    concept: config.concept.positive_class
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('topicInput').value = data.topic;
+                showStatus('Topic generated!');
+            } else {
+                showStatus('Error: ' + data.error, true);
+            }
+        } catch (error) {
+            showStatus('Error: ' + error.message, true);
+        } finally {
+            setLoading(btn, false);
+        }
+    }
+
+    async function generateQuestion() {
+        const btn = event.target;
+        setLoading(btn, true);
+        try {
+            const topic = document.getElementById('topicInput').value.trim() || null;
+            const response = await fetch('/playground/generate_question', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    positive_class: config.concept.positive_class,
+                    negative_class: config.concept.negative_class,
+                    topic: topic
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('questionInput').value = data.question;
+                showStatus('Question generated!');
+            } else {
+                showStatus('Error: ' + data.error, true);
+            }
+        } catch (error) {
+            showStatus('Error: ' + error.message, true);
+        } finally {
+            setLoading(btn, false);
+        }
+    }
+
+    async function generatePositiveResponse() {
+        const btn = event.target;
+        const question = document.getElementById('questionInput').value.trim();
+        if (!question) {
+            showStatus('Please enter a question first', true);
+            return;
+        }
+
+        setLoading(btn, true);
+        try {
+            const response = await fetch('/playground/generate_response', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    positive_class: config.concept.positive_class,
+                    negative_class: config.concept.negative_class,
+                    question: question,
+                    is_positive: true,
+                    temperature: parseFloat(document.getElementById('posTemp').value),
+                    max_tokens: parseInt(document.getElementById('posMaxTokens').value)
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('positiveResponseInput').value = data.response;
+                showStatus('Positive response generated!');
+            } else {
+                showStatus('Error: ' + data.error, true);
+            }
+        } catch (error) {
+            showStatus('Error: ' + error.message, true);
+        } finally {
+            setLoading(btn, false);
+        }
+    }
+
+    async function generateNegativeResponse() {
+        const btn = event.target;
+        const question = document.getElementById('questionInput').value.trim();
+        const positiveResponse = document.getElementById('positiveResponseInput').value.trim();
+
+        if (!question) {
+            showStatus('Please enter a question first', true);
+            return;
+        }
+        if (!positiveResponse) {
+            showStatus('Please generate positive response first', true);
+            return;
+        }
+
+        setLoading(btn, true);
+        try {
+            const response = await fetch('/playground/generate_response', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    positive_class: config.concept.positive_class,
+                    negative_class: config.concept.negative_class,
+                    question: question,
+                    is_positive: false,
+                    reference_response: positiveResponse,
+                    temperature: parseFloat(document.getElementById('negTemp').value),
+                    max_tokens: parseInt(document.getElementById('negMaxTokens').value)
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('negativeResponseInput').value = data.response;
+                showStatus('Negative response generated (pair-aware)!');
+            } else {
+                showStatus('Error: ' + data.error, true);
+            }
+        } catch (error) {
+            showStatus('Error: ' + error.message, true);
+        } finally {
+            setLoading(btn, false);
+        }
+    }
+
+    async function analyzePair() {
+        const btn = event.target;
+        const question = document.getElementById('questionInput').value.trim();
+        const positiveResponse = document.getElementById('positiveResponseInput').value.trim();
+        const negativeResponse = document.getElementById('negativeResponseInput').value.trim();
+
+        if (!question || !positiveResponse || !negativeResponse) {
+            showStatus('Please complete all generation steps first', true);
+            return;
+        }
+
+        setLoading(btn, true);
+        showStatus('Analyzing... This may take 10-20 seconds');
+
+        try {
+            // First, analyze with SAE features
+            const analyzeResponse = await fetch('/playground/analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    question: question,
+                    positive_response: positiveResponse,
+                    negative_response: negativeResponse,
+                    layer: config.model.layer
+                })
+            });
+            const analyzeData = await analyzeResponse.json();
+
+            if (!analyzeData.success) {
+                showStatus('Error: ' + analyzeData.error, true);
+                return;
+            }
+
+            // Display results
+            displayAnalysisResults(analyzeData.results);
+
+            // Now search for label-based features
+            const positiveText = `User: ${question}\nAssistant: ${positiveResponse}`;
+            const negativeText = `User: ${question}\nAssistant: ${negativeResponse}`;
+
+            const labelResponse = await fetch('/playground/search_labels', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    keywords: LABEL_KEYWORDS,
+                    positive_text: positiveText,
+                    negative_text: negativeText,
+                    layer: config.model.layer
+                })
+            });
+            const labelData = await labelResponse.json();
+
+            if (labelData.success) {
+                displayLabelTracking(labelData.keyword_results);
+            }
+
+            showStatus('Analysis complete!');
+        } catch (error) {
+            showStatus('Error: ' + error.message, true);
+        } finally {
+            setLoading(btn, false);
+        }
+    }
+
+    function displayAnalysisResults(results) {
+        document.getElementById('analysisResults').style.display = 'block';
+        document.getElementById('analysisPlaceholder').style.display = 'none';
+
+        // Update token counts
+        document.getElementById('posTokenCount').textContent = results.num_positive_tokens;
+        document.getElementById('negTokenCount').textContent = results.num_negative_tokens;
+
+        // Display features
+        displayFeatureList('positiveFeatureList', results.positive_features);
+        displayFeatureList('negativeFeatureList', results.negative_features);
+        displayFeatureList('contrastivePositiveList', results.contrastive_positive, true);
+        displayFeatureList('contrastiveNegativeList', results.contrastive_negative, true);
+    }
+
+    function displayFeatureList(elementId, features, isContrastive = false) {
+        const list = document.getElementById(elementId);
+        list.innerHTML = features.map(f => `
+            <li class="feature-item">
+                <span class="feature-label">${f.label}</span>
+                <span class="feature-strength ${isContrastive ? (f.cosine_similarity > 0 ? 'positive-direction' : 'negative-direction') : ''}">
+                    ${f.cosine_similarity > 0 ? '+' : ''}${f.cosine_similarity.toFixed(3)}
+                </span>
+            </li>
+        `).join('');
+    }
+
+    function displayLabelTracking(results) {
+        const tbody = document.getElementById('labelTrackingBody');
+        tbody.innerHTML = results.map(r => `
+            <tr>
+                <td><strong>${r.keyword}</strong></td>
+                <td>${r.num_matches || 'N/A'}</td>
+                <td class="${r.positive_cosine > 0.1 ? 'highlight-positive' : ''}">${r.positive_cosine ? r.positive_cosine.toFixed(3) : 'N/A'}</td>
+                <td class="${r.negative_cosine > 0.1 ? 'highlight-positive' : ''}">${r.negative_cosine ? r.negative_cosine.toFixed(3) : 'N/A'}</td>
+                <td class="${r.difference > 0 ? 'highlight-positive' : 'highlight-negative'}">${r.difference ? (r.difference > 0 ? '+' : '') + r.difference.toFixed(3) : 'N/A'}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function savePair() {
+        const btn = event.target;
+        const question = document.getElementById('questionInput').value.trim();
+        const positiveResponse = document.getElementById('positiveResponseInput').value.trim();
+        const negativeResponse = document.getElementById('negativeResponseInput').value.trim();
+        const topic = document.getElementById('topicInput').value.trim();
+
+        if (!question || !positiveResponse || !negativeResponse) {
+            showStatus('Please complete all generation steps first', true);
+            return;
+        }
+
+        setLoading(btn, true);
+        try {
+            const response = await fetch('/playground/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    pair: {
+                        topic: topic || null,
+                        question: question,
+                        positive_response: positiveResponse,
+                        negative_response: negativeResponse,
+                        positive_activations: true,  // Signal to save activations
+                        negative_activations: true,
+                        layer: config.model.layer,
+                        metadata: {
+                            generation_method: 'manual_playground',
+                            timestamp: new Date().toISOString()
+                        }
+                    }
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                showStatus(`Saved as pair ${data.pair_id} in outputs/manual/`);
+            } else {
+                showStatus('Error: ' + data.error, true);
+            }
+        } catch (error) {
+            showStatus('Error: ' + error.message, true);
+        } finally {
+            setLoading(btn, false);
+        }
+    }
+    </script>
+</body>
+</html>

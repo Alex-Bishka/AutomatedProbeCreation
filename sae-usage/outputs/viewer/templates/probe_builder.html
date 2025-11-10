@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Probe Builder</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>Semantic Probe Builder</h1>
+        <p class="subtitle">Build and Test Feature-Based Probes</p>
+        <div style="margin-top: 1rem;">
+            <a href="/" style="margin-right: 1rem;">← Back to Runs</a>
+            <a href="/playground" style="margin-right: 1rem;">→ Playground</a>
+            <a href="/steering">→ Steering Tester</a>
+        </div>
+    </div>
+
+    <div class="probe-builder-container">
+        <!-- Left Panel: Probe Builder -->
+        <div class="probe-builder-panel">
+            <h2>Build Probe</h2>
+
+            <!-- Search Section -->
+            <div class="section-card">
+                <h3>1. Search Features</h3>
+                <p class="help-text">Search for SAE features by keyword in their labels</p>
+                <div class="search-row">
+                    <input type="text" id="searchKeyword" placeholder="e.g., deception, lying, honest..." class="full-width">
+                    <button onclick="searchFeatures()" class="btn btn-primary">Search</button>
+                </div>
+                <div id="searchStatus" class="status-message"></div>
+            </div>
+
+            <!-- Search Results Section -->
+            <div class="section-card" id="searchResultsSection" style="display: none;">
+                <h3>2. Select Features</h3>
+                <p class="help-text" id="searchResultsCount"></p>
+                <div id="searchResults" class="feature-list"></div>
+            </div>
+
+            <!-- Selected Features Section - Two Buckets -->
+            <div class="section-card">
+                <h3>3. Selected Features</h3>
+                <p class="help-text">Total: <span id="selectedCount">0</span> features (<span id="countA">0</span> in Probe A, <span id="countB">0</span> in Probe B)</p>
+
+                <div class="probe-buckets-container">
+                    <!-- Probe A Bucket -->
+                    <div class="probe-bucket">
+                        <div class="probe-bucket-header">
+                            <h4>Probe A</h4>
+                            <button onclick="clearProbeFeatures('A')" class="btn-small btn-warning">Clear</button>
+                        </div>
+                        <div id="selectedFeaturesA" class="selected-features-list"></div>
+                    </div>
+
+                    <!-- Probe B Bucket -->
+                    <div class="probe-bucket">
+                        <div class="probe-bucket-header">
+                            <h4>Probe B</h4>
+                            <button onclick="clearProbeFeatures('B')" class="btn-small btn-warning">Clear</button>
+                        </div>
+                        <div id="selectedFeaturesB" class="selected-features-list"></div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <button onclick="clearAllFeatures()" class="btn btn-warning">Clear All</button>
+                    <button onclick="showSaveDialog()" class="btn btn-success" id="saveBtn" disabled>Save Probe(s)</button>
+                </div>
+            </div>
+
+            <!-- Save Dialog (hidden by default) -->
+            <div id="saveDialog" class="section-card" style="display: none; background-color: #f8f9fa;">
+                <h3>Save Probe(s)</h3>
+                <label>Probe Name:</label>
+                <input type="text" id="probeName" placeholder="e.g., deception" class="full-width">
+                <label style="margin-top: 1rem;">Description (optional):</label>
+                <textarea id="probeDescription" rows="3" placeholder="Describe what this probe measures..." class="full-width"></textarea>
+                <label style="margin-top: 1rem;">Save Format:</label>
+                <select id="saveFormat" class="full-width">
+                    <option value="individual">Individual probes (separate files)</option>
+                    <option value="package">Differential probe package (one file)</option>
+                    <option value="both">Both formats</option>
+                </select>
+                <p class="help-text" style="margin-top: 0.5rem; font-size: 0.85rem;">Individual: saves probe_a.json and probe_b.json. Package: saves differential.json with both.</p>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <button onclick="saveProbe()" class="btn btn-success">Save</button>
+                    <button onclick="hideSaveDialog()" class="btn">Cancel</button>
+                </div>
+                <div id="saveStatus" class="status-message"></div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Probe Tester -->
+        <div class="probe-tester-panel">
+            <h2>Test Probe</h2>
+
+            <!-- Test Input Section -->
+            <div class="section-card">
+                <h3>Conversation Input</h3>
+                <label>System Prompt (optional):</label>
+                <p class="help-text" style="margin-top: 0.25rem; margin-bottom: 0.5rem;">Leave empty to test without a system prompt</p>
+                <textarea id="systemPrompt" rows="2" placeholder="e.g., You are a helpful AI assistant..." class="full-width"></textarea>
+
+                <label style="margin-top: 1rem;">User Message:</label>
+                <textarea id="userMessage" rows="3" placeholder="Enter the user's message..." class="full-width"></textarea>
+
+                <label style="margin-top: 1rem;">Assistant Response:</label>
+                <textarea id="assistantResponse" rows="5" placeholder="Enter the assistant's response..." class="full-width"></textarea>
+
+                <label style="margin-top: 1rem;">Test Mode:</label>
+                <div class="test-mode-selector">
+                    <label class="radio-label">
+                        <input type="radio" name="testMode" value="probe_a" checked onchange="updateTestMode()">
+                        <span>Probe A</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="testMode" value="probe_b" onchange="updateTestMode()">
+                        <span>Probe B</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="testMode" value="difference" onchange="updateTestMode()">
+                        <span>Difference (A - B)</span>
+                    </label>
+                </div>
+
+                <button onclick="testProbe()" class="btn btn-primary" id="testBtn" disabled style="margin-top: 1rem;">Test Conversation</button>
+                <div id="testStatus" class="status-message"></div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="section-card" id="resultsSection" style="display: none;">
+                <h3>Results</h3>
+
+                <!-- Three-column results display -->
+                <div id="multiProbeResults" class="multi-probe-results" style="display: none;">
+                    <div class="probe-result-column">
+                        <div class="result-label">Probe A</div>
+                        <div class="result-value" id="cosineSimilarityA">--</div>
+                        <div class="result-detail-small">
+                            <span id="numFeaturesA">--</span> features
+                        </div>
+                    </div>
+                    <div class="probe-result-column">
+                        <div class="result-label">Probe B</div>
+                        <div class="result-value" id="cosineSimilarityB">--</div>
+                        <div class="result-detail-small">
+                            <span id="numFeaturesB">--</span> features
+                        </div>
+                    </div>
+                    <div class="probe-result-column highlighted">
+                        <div class="result-label">Difference (A - B)</div>
+                        <div class="result-value" id="cosineSimilarityDiff">--</div>
+                        <div class="result-detail-small">
+                            Normalized difference
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Single probe result display -->
+                <div id="singleProbeResult" class="probe-result">
+                    <div class="result-main">
+                        <div class="result-label" id="singleProbeLabel">Cosine Similarity</div>
+                        <div class="result-value" id="cosineSimilarity">--</div>
+                    </div>
+                    <div class="result-details">
+                        <div class="result-detail-item">
+                            <span class="result-detail-label">Activation Magnitude:</span>
+                            <span id="activationMagnitude">--</span>
+                        </div>
+                        <div class="result-detail-item">
+                            <span class="result-detail-label">Features in Probe:</span>
+                            <span id="numFeatures">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="help-text" style="margin-top: 1rem;">
+                    <strong>Interpretation:</strong>
+                    <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                        <li>Positive values indicate alignment with the probe direction</li>
+                        <li>Values near 0 indicate no relationship</li>
+                        <li>Negative values indicate anti-alignment (opposite direction)</li>
+                        <li>Difference (A - B): Measures contrastive direction between two concepts</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state - track two separate probes
+        let selectedFeaturesA = new Set();
+        let selectedFeaturesB = new Set();
+        let allLabels = {};
+        let currentTestMode = 'probe_a'; // 'probe_a', 'probe_b', or 'difference'
+
+        function searchFeatures() {
+            const keyword = document.getElementById('searchKeyword').value.trim();
+            if (!keyword) {
+                showStatus('searchStatus', 'Please enter a search keyword', 'error');
+                return;
+            }
+
+            showStatus('searchStatus', 'Searching...', 'loading');
+
+            fetch('/probe-builder/search', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({keyword: keyword})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displaySearchResults(data.features, data.count);
+                    showStatus('searchStatus', `Found ${data.count} features`, 'success');
+                } else {
+                    showStatus('searchStatus', `Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('searchStatus', `Error: ${error}`, 'error');
+            });
+        }
+
+        function displaySearchResults(features, count) {
+            const resultsDiv = document.getElementById('searchResults');
+            const sectionDiv = document.getElementById('searchResultsSection');
+            const countP = document.getElementById('searchResultsCount');
+
+            if (features.length === 0) {
+                resultsDiv.innerHTML = '<p style="color: var(--secondary-color);">No features found</p>';
+                sectionDiv.style.display = 'block';
+                return;
+            }
+
+            countP.textContent = `${count} features found - click buttons to add to Probe A or B`;
+            sectionDiv.style.display = 'block';
+
+            resultsDiv.innerHTML = features.map(f => {
+                const inA = selectedFeaturesA.has(f.id);
+                const inB = selectedFeaturesB.has(f.id);
+                return `
+                <div class="feature-item ${inA || inB ? 'selected' : ''}">
+                    <div class="feature-details">
+                        <div class="feature-id">#${f.id}</div>
+                        <div class="feature-label">${f.label}</div>
+                    </div>
+                    <div class="feature-actions">
+                        <button class="btn-small ${inA ? 'btn-success' : 'btn-primary'}" onclick="addToProbe(${f.id}, '${escapeHtml(f.label)}', 'A')" ${inA ? 'disabled' : ''}>
+                            ${inA ? '✓ In A' : '+ Add to A'}
+                        </button>
+                        <button class="btn-small ${inB ? 'btn-success' : 'btn-primary'}" onclick="addToProbe(${f.id}, '${escapeHtml(f.label)}', 'B')" ${inB ? 'disabled' : ''}>
+                            ${inB ? '✓ In B' : '+ Add to B'}
+                        </button>
+                    </div>
+                </div>
+            `}).join('');
+
+            // Store labels for later use
+            features.forEach(f => {
+                allLabels[f.id] = f.label;
+            });
+        }
+
+        function addToProbe(featureId, label, probe) {
+            allLabels[featureId] = label;
+
+            if (probe === 'A') {
+                selectedFeaturesA.add(featureId);
+            } else {
+                selectedFeaturesB.add(featureId);
+            }
+
+            updateSelectedFeatures();
+            updateButtonStates();
+
+            // Re-render search results to update buttons
+            searchFeatures();
+        }
+
+        function updateSelectedFeatures() {
+            const selectedDivA = document.getElementById('selectedFeaturesA');
+            const selectedDivB = document.getElementById('selectedFeaturesB');
+            const countSpan = document.getElementById('selectedCount');
+            const countA = document.getElementById('countA');
+            const countB = document.getElementById('countB');
+
+            countA.textContent = selectedFeaturesA.size;
+            countB.textContent = selectedFeaturesB.size;
+            countSpan.textContent = selectedFeaturesA.size + selectedFeaturesB.size;
+
+            // Update Probe A
+            if (selectedFeaturesA.size === 0) {
+                selectedDivA.innerHTML = '<p style="color: var(--secondary-color); font-size: 0.9rem;">No features</p>';
+            } else {
+                const selectedArray = Array.from(selectedFeaturesA).sort((a, b) => a - b);
+                selectedDivA.innerHTML = selectedArray.map(id => `
+                    <div class="selected-feature-item">
+                        <span class="feature-id">#${id}</span>
+                        <span class="feature-label">${allLabels[id] || ''}</span>
+                        <button class="remove-btn" onclick="removeFeature(${id}, 'A')">✕</button>
+                    </div>
+                `).join('');
+            }
+
+            // Update Probe B
+            if (selectedFeaturesB.size === 0) {
+                selectedDivB.innerHTML = '<p style="color: var(--secondary-color); font-size: 0.9rem;">No features</p>';
+            } else {
+                const selectedArray = Array.from(selectedFeaturesB).sort((a, b) => a - b);
+                selectedDivB.innerHTML = selectedArray.map(id => `
+                    <div class="selected-feature-item">
+                        <span class="feature-id">#${id}</span>
+                        <span class="feature-label">${allLabels[id] || ''}</span>
+                        <button class="remove-btn" onclick="removeFeature(${id}, 'B')">✕</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function removeFeature(featureId, probe) {
+            if (probe === 'A') {
+                selectedFeaturesA.delete(featureId);
+            } else {
+                selectedFeaturesB.delete(featureId);
+            }
+            updateSelectedFeatures();
+            updateButtonStates();
+            // Re-render search results if visible
+            if (document.getElementById('searchResults').innerHTML) {
+                searchFeatures();
+            }
+        }
+
+        function clearProbeFeatures(probe) {
+            const targetSet = probe === 'A' ? selectedFeaturesA : selectedFeaturesB;
+            if (targetSet.size === 0) return;
+            if (confirm(`Clear all features from Probe ${probe}?`)) {
+                targetSet.clear();
+                updateSelectedFeatures();
+                updateButtonStates();
+                // Re-render search results if visible
+                if (document.getElementById('searchResults').innerHTML) {
+                    searchFeatures();
+                }
+            }
+        }
+
+        function clearAllFeatures() {
+            if (selectedFeaturesA.size === 0 && selectedFeaturesB.size === 0) return;
+            if (confirm('Clear all selected features from both probes?')) {
+                selectedFeaturesA.clear();
+                selectedFeaturesB.clear();
+                updateSelectedFeatures();
+                updateButtonStates();
+                // Re-render search results if visible
+                if (document.getElementById('searchResults').innerHTML) {
+                    searchFeatures();
+                }
+            }
+        }
+
+        function updateButtonStates() {
+            const hasFeatures = selectedFeaturesA.size > 0 || selectedFeaturesB.size > 0;
+            document.getElementById('saveBtn').disabled = !hasFeatures;
+            document.getElementById('testBtn').disabled = !hasFeatures;
+        }
+
+        function updateTestMode() {
+            const selected = document.querySelector('input[name="testMode"]:checked');
+            if (selected) {
+                currentTestMode = selected.value;
+            }
+        }
+
+        function showSaveDialog() {
+            document.getElementById('saveDialog').style.display = 'block';
+            document.getElementById('probeName').value = '';
+            document.getElementById('probeDescription').value = '';
+            document.getElementById('saveStatus').textContent = '';
+        }
+
+        function hideSaveDialog() {
+            document.getElementById('saveDialog').style.display = 'none';
+        }
+
+        function saveProbe() {
+            const probeName = document.getElementById('probeName').value.trim();
+            const description = document.getElementById('probeDescription').value.trim();
+            const saveFormat = document.getElementById('saveFormat').value;
+
+            if (!probeName) {
+                showStatus('saveStatus', 'Please enter a probe name', 'error');
+                return;
+            }
+
+            if (selectedFeaturesA.size === 0 && selectedFeaturesB.size === 0) {
+                showStatus('saveStatus', 'Please select at least one feature', 'error');
+                return;
+            }
+
+            showStatus('saveStatus', 'Saving...', 'loading');
+
+            fetch('/probe-builder/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    probe_name: probeName,
+                    selected_features_a: Array.from(selectedFeaturesA),
+                    selected_features_b: Array.from(selectedFeaturesB),
+                    description: description,
+                    save_format: saveFormat
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('saveStatus', data.message, 'success');
+                    setTimeout(() => {
+                        hideSaveDialog();
+                    }, 2000);
+                } else {
+                    showStatus('saveStatus', `Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('saveStatus', `Error: ${error}`, 'error');
+            });
+        }
+
+        function testProbe() {
+            const systemPrompt = document.getElementById('systemPrompt').value.trim();
+            const userMessage = document.getElementById('userMessage').value.trim();
+            const assistantResponse = document.getElementById('assistantResponse').value.trim();
+
+            if (!userMessage || !assistantResponse) {
+                showStatus('testStatus', 'Please enter both user message and assistant response', 'error');
+                return;
+            }
+
+            if (selectedFeaturesA.size === 0 && selectedFeaturesB.size === 0) {
+                showStatus('testStatus', 'Please select at least one feature', 'error');
+                return;
+            }
+
+            // Validate test mode selection
+            if (currentTestMode === 'probe_a' && selectedFeaturesA.size === 0) {
+                showStatus('testStatus', 'Probe A has no features. Please add features or switch test mode.', 'error');
+                return;
+            }
+            if (currentTestMode === 'probe_b' && selectedFeaturesB.size === 0) {
+                showStatus('testStatus', 'Probe B has no features. Please add features or switch test mode.', 'error');
+                return;
+            }
+            if (currentTestMode === 'difference' && (selectedFeaturesA.size === 0 || selectedFeaturesB.size === 0)) {
+                showStatus('testStatus', 'Difference mode requires features in both probes', 'error');
+                return;
+            }
+
+            showStatus('testStatus', 'Testing...', 'loading');
+
+            fetch('/probe-builder/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    system_prompt: systemPrompt,
+                    user_message: userMessage,
+                    assistant_response: assistantResponse,
+                    selected_features_a: Array.from(selectedFeaturesA),
+                    selected_features_b: Array.from(selectedFeaturesB),
+                    test_mode: currentTestMode
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayTestResults(data);
+                    showStatus('testStatus', 'Test complete', 'success');
+                } else {
+                    showStatus('testStatus', `Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('testStatus', `Error: ${error}`, 'error');
+            });
+        }
+
+        function displayTestResults(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            const multiProbeResults = document.getElementById('multiProbeResults');
+            const singleProbeResult = document.getElementById('singleProbeResult');
+
+            // Check if we have all three results (multi-probe mode)
+            if (data.cosine_similarity_a !== undefined && data.cosine_similarity_b !== undefined && data.cosine_similarity_diff !== undefined) {
+                // Show multi-probe display
+                multiProbeResults.style.display = 'grid';
+                singleProbeResult.style.display = 'none';
+
+                // Update Probe A
+                const simA = data.cosine_similarity_a;
+                document.getElementById('cosineSimilarityA').textContent = simA.toFixed(4);
+                document.getElementById('numFeaturesA').textContent = data.num_features_a;
+                const valueA = document.getElementById('cosineSimilarityA');
+                valueA.style.color = simA > 0.1 ? '#2e7d32' : (simA < -0.1 ? '#c62828' : '#666');
+
+                // Update Probe B
+                const simB = data.cosine_similarity_b;
+                document.getElementById('cosineSimilarityB').textContent = simB.toFixed(4);
+                document.getElementById('numFeaturesB').textContent = data.num_features_b;
+                const valueB = document.getElementById('cosineSimilarityB');
+                valueB.style.color = simB > 0.1 ? '#2e7d32' : (simB < -0.1 ? '#c62828' : '#666');
+
+                // Update Difference
+                const simDiff = data.cosine_similarity_diff;
+                document.getElementById('cosineSimilarityDiff').textContent = simDiff.toFixed(4);
+                const valueDiff = document.getElementById('cosineSimilarityDiff');
+                valueDiff.style.color = simDiff > 0.1 ? '#2e7d32' : (simDiff < -0.1 ? '#c62828' : '#666');
+            } else {
+                // Show single probe display
+                multiProbeResults.style.display = 'none';
+                singleProbeResult.style.display = 'block';
+
+                const cosineSim = data.cosine_similarity;
+                document.getElementById('cosineSimilarity').textContent = cosineSim.toFixed(4);
+                document.getElementById('activationMagnitude').textContent = data.activation_magnitude.toFixed(2);
+                document.getElementById('numFeatures').textContent = data.num_features;
+
+                // Update label based on test mode
+                const label = currentTestMode === 'probe_a' ? 'Probe A - Cosine Similarity' :
+                              currentTestMode === 'probe_b' ? 'Probe B - Cosine Similarity' :
+                              'Difference (A - B) - Cosine Similarity';
+                document.getElementById('singleProbeLabel').textContent = label;
+
+                // Color code
+                const valueDiv = document.getElementById('cosineSimilarity');
+                valueDiv.style.color = cosineSim > 0.1 ? '#2e7d32' : (cosineSim < -0.1 ? '#c62828' : '#666');
+            }
+
+            resultsSection.style.display = 'block';
+        }
+
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'status-message';
+            if (type === 'error') {
+                element.style.color = '#c62828';
+            } else if (type === 'success') {
+                element.style.color = '#2e7d32';
+            } else if (type === 'loading') {
+                element.style.color = '#1976d2';
+            } else {
+                element.style.color = '#666';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Enter key support for search
+        document.getElementById('searchKeyword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchFeatures();
+            }
+        });
+    </script>
+</body>
+</html>

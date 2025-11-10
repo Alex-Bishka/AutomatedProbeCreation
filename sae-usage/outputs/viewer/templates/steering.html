@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steering Vector Tester</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>Steering Vector Tester</h1>
+        <p class="subtitle">Test SAE Feature Directions by Steering Generation</p>
+        <div style="margin-top: 1rem;">
+            <a href="/" style="margin-right: 1rem;">← Back to Runs</a>
+            <a href="/playground" style="margin-right: 1rem;">→ Playground</a>
+            <a href="/probe-builder">→ Probe Builder</a>
+        </div>
+    </div>
+
+    <div class="steering-container">
+        <!-- Left Panel: Steering Controls -->
+        <div class="steering-controls-panel">
+            <h2>Steering Configuration</h2>
+
+            <!-- Feature Selection -->
+            <div class="section-card">
+                <h3>1. Select SAE Feature</h3>
+                <p class="help-text">Enter a feature index (0-131071) to test its direction</p>
+                <div class="feature-input-row">
+                    <input type="number" id="featureIndex" min="0" max="131071" placeholder="Feature index..." class="feature-index-input">
+                    <button onclick="loadFeatureLabel()" class="btn btn-primary">Load Label</button>
+                </div>
+                <div id="featureLabelDisplay" class="feature-label-box" style="display: none;">
+                    <strong>Label:</strong> <span id="featureLabel"></span>
+                </div>
+                <div id="labelStatus" class="status-message"></div>
+            </div>
+
+            <!-- Steering Strength -->
+            <div class="section-card">
+                <h3>2. Steering Strength</h3>
+                <p class="help-text">Positive values amplify, negative values suppress the feature</p>
+                <div class="slider-container">
+                    <input type="range" id="steeringStrength" min="-20" max="20" step="0.1" value="3" class="full-width">
+                    <div class="slider-value-display">
+                        <span>Strength: <strong id="strengthValue">3.0</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Prompt -->
+            <div class="section-card">
+                <h3>3. Test Prompt</h3>
+                <p class="help-text">Enter a prompt to see how steering affects generation</p>
+                <textarea id="testPrompt" rows="4" placeholder="Enter a prompt to test how this feature affects model behavior..." class="full-width"></textarea>
+            </div>
+
+            <!-- Generation Settings -->
+            <div class="section-card">
+                <h3>4. Generation Settings</h3>
+                <div class="settings-grid">
+                    <div>
+                        <label>Temperature:</label>
+                        <input type="number" id="temperature" value="0.7" step="0.1" min="0" max="2" class="setting-input">
+                    </div>
+                    <div>
+                        <label>Max Tokens:</label>
+                        <input type="number" id="maxTokens" value="256" step="50" min="50" max="1000" class="setting-input">
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="runSteering()" class="btn btn-primary btn-large" id="generateBtn">Generate Comparison</button>
+            <div id="status" class="status-message"></div>
+        </div>
+
+        <!-- Right Panel: Side-by-side Results -->
+        <div class="steering-results-panel">
+            <h2>Generation Comparison</h2>
+
+            <div id="resultsPlaceholder" class="results-placeholder">
+                <p>Configure steering and click "Generate Comparison" to see results</p>
+            </div>
+
+            <div id="comparisonContainer" class="comparison-container" style="display: none;">
+                <div class="generation-result baseline-result">
+                    <h3>Baseline (No Steering)</h3>
+                    <div id="baselineText" class="generation-output"></div>
+                </div>
+
+                <div class="generation-result steered-result">
+                    <h3>Steered (Strength: <span id="appliedStrength">--</span>)</h3>
+                    <div id="steeredText" class="generation-output"></div>
+                </div>
+            </div>
+
+            <!-- Feature Info Display -->
+            <div id="featureInfoCard" class="feature-info-card" style="display: none;">
+                <h4>Applied Feature</h4>
+                <p><strong>Index:</strong> <span id="appliedFeatureIndex">--</span></p>
+                <p><strong>Label:</strong> <span id="appliedFeatureLabel">--</span></p>
+                <p><strong>Layer:</strong> <span id="appliedLayer">--</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update slider display in real-time
+        document.getElementById('steeringStrength').addEventListener('input', function(e) {
+            document.getElementById('strengthValue').textContent = parseFloat(e.target.value).toFixed(1);
+        });
+
+        async function loadFeatureLabel() {
+            const index = parseInt(document.getElementById('featureIndex').value);
+
+            if (isNaN(index) || index < 0 || index > 131071) {
+                showStatus('labelStatus', 'Please enter a valid feature index (0-131071)', 'error');
+                return;
+            }
+
+            showStatus('labelStatus', 'Loading label...', 'loading');
+
+            try {
+                const response = await fetch('/steering/get_label', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ feature_index: index })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('featureLabel').textContent = data.label;
+                    document.getElementById('featureLabelDisplay').style.display = 'block';
+                    showStatus('labelStatus', 'Label loaded', 'success');
+                } else {
+                    showStatus('labelStatus', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('labelStatus', `Error: ${error}`, 'error');
+            }
+        }
+
+        async function runSteering() {
+            const featureIndex = parseInt(document.getElementById('featureIndex').value);
+            const strength = parseFloat(document.getElementById('steeringStrength').value);
+            const prompt = document.getElementById('testPrompt').value.trim();
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const maxTokens = parseInt(document.getElementById('maxTokens').value);
+
+            // Validate inputs
+            if (isNaN(featureIndex) || featureIndex < 0 || featureIndex > 131071) {
+                showStatus('status', 'Please enter a valid feature index (0-131071)', 'error');
+                return;
+            }
+
+            if (!prompt) {
+                showStatus('status', 'Please enter a test prompt', 'error');
+                return;
+            }
+
+            // Disable button and show loading
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            showStatus('status', 'Generating baseline and steered outputs... This may take 30-60 seconds.', 'loading');
+
+            try {
+                const response = await fetch('/steering/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        feature_index: featureIndex,
+                        steering_strength: strength,
+                        prompt: prompt,
+                        temperature: temperature,
+                        max_tokens: maxTokens,
+                        layer: {{ config['model']['layer'] }}
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    displayResults(data);
+                    showStatus('status', 'Generation complete!', 'success');
+                } else {
+                    showStatus('status', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('status', `Error: ${error}`, 'error');
+            } finally {
+                generateBtn.disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            // Hide placeholder, show results
+            document.getElementById('resultsPlaceholder').style.display = 'none';
+            document.getElementById('comparisonContainer').style.display = 'grid';
+            document.getElementById('featureInfoCard').style.display = 'block';
+
+            // Display text outputs
+            document.getElementById('baselineText').textContent = data.baseline_text;
+            document.getElementById('steeredText').textContent = data.steered_text;
+
+            // Display metadata
+            document.getElementById('appliedStrength').textContent = data.steering_strength.toFixed(1);
+            document.getElementById('appliedFeatureIndex').textContent = data.feature_index;
+            document.getElementById('appliedFeatureLabel').textContent = data.feature_label;
+            document.getElementById('appliedLayer').textContent = data.layer;
+        }
+
+        function showStatus(elementId, message, type) {
+            const statusEl = document.getElementById(elementId);
+            statusEl.textContent = message;
+            statusEl.className = 'status-message';
+
+            if (type === 'error') {
+                statusEl.classList.add('error');
+            } else if (type === 'success') {
+                statusEl.classList.add('success');
+            } else if (type === 'loading') {
+                statusEl.classList.add('loading');
+            }
+
+            // Auto-clear success/loading messages after 5 seconds
+            if (type === 'success' || type === 'loading') {
+                setTimeout(() => {
+                    if (statusEl.classList.contains(type)) {
+                        statusEl.textContent = '';
+                        statusEl.className = 'status-message';
+                    }
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>

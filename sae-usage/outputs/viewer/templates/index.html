@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAE Probe Data Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>SAE-Guided Probe Data Generation</h1>
+        <p class="subtitle">Results Viewer</p>
+        <div style="margin-top: 1rem;">
+            <a href="/playground" style="margin-right: 1rem;">→ Playground</a>
+            <a href="/probe-builder" style="margin-right: 1rem;">→ Probe Builder</a>
+            <a href="/steering">→ Steering Tester</a>
+        </div>
+    </div>
+
+    <h2>Available Runs</h2>
+
+    {% if runs %}
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Number of Pairs</th>
+                <th>Avg Quality Score</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+            <tr>
+                <td><code>{{ run.timestamp }}</code></td>
+                <td>{{ run.num_pairs }}</td>
+                <td>
+                    {% if run.avg_quality is not none %}
+                        <strong>{{ "%.2f"|format(run.avg_quality) }}</strong>
+                    {% else %}
+                        <span style="color: var(--secondary-color)">N/A</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if run.has_validation %}
+                        <span class="badge badge-success">✓ Validated</span>
+                    {% else %}
+                        <span class="badge badge-warning">⚠ No Validation</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('view_run', timestamp=run.timestamp) }}">View Details →</a>
+                    <button class="delete-btn" onclick="deleteRun('{{ run.timestamp }}')">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="card">
+        <p style="color: var(--secondary-color); text-align: center; padding: 2rem;">
+            No runs found. Generate some data first by running:
+            <code style="display: block; margin-top: 1rem; padding: 1rem; background-color: #f5f5f5; border-radius: 4px;">
+                uv run python main.py --config config.yaml
+            </code>
+        </p>
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-top: 3rem; background-color: #f8f9fa;">
+        <h3>About</h3>
+        <p>
+            This viewer displays results from the SAE-guided automated probe data generation pipeline.
+            Each run generates contrastive pairs (deceptive vs honest examples) and validates them using
+            Goodfire's SAE features.
+        </p>
+        <p style="margin-top: 1rem;">
+            <strong>Features:</strong>
+        </p>
+        <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+            <li>Browse all experimental runs</li>
+            <li>View SAE feature activations for each example</li>
+            <li>Inspect token-level activation heatmaps</li>
+            <li>Analyze quality scores and feature overlap</li>
+        </ul>
+    </div>
+
+    <script>
+    function deleteRun(timestamp) {
+        if (confirm(`Are you sure you want to delete run ${timestamp}? This action cannot be undone.`)) {
+            fetch(`/delete/${timestamp}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Successfully deleted run ${timestamp}`);
+                    window.location.reload();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                alert(`Error deleting run: ${error}`);
+            });
+        }
+    }
+    </script>
+</body>
+</html>

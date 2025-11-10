@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run {{ timestamp }} - SAE Probe Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <a href="{{ url_for('index') }}" class="back-link">Back to Runs</a>
+        <button class="delete-btn" onclick="deleteRunAndRedirect('{{ timestamp }}')">Delete This Run</button>
+    </div>
+
+    <div class="header">
+        <h1>Run: {{ timestamp }}</h1>
+        {% if config %}
+        <p class="subtitle">
+            Concept: {{ config.concept.positive_class|capitalize }} vs {{ config.concept.negative_class|capitalize }} |
+            Model: {{ config.model.name }} (Layer {{ config.model.layer }})
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Quality Metrics Dashboard -->
+    {% if validation_results %}
+    <h2>Quality Metrics</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ pairs|length }}</div>
+            <div class="stat-label">Total Pairs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">
+                {% set scores = validation_results|map(attribute='quality_score')|list %}
+                {{ "%.2f"|format(scores|sum / scores|length) }}
+            </div>
+            <div class="stat-label">Avg Quality</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">
+                {% set overlaps = validation_results|map(attribute='positive_overlap')|list %}
+                {{ "%.1f"|format(overlaps|sum / overlaps|length) }}
+            </div>
+            <div class="stat-label">Avg Positive Overlap</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">
+                {% set overlaps = validation_results|map(attribute='negative_overlap')|list %}
+                {{ "%.1f"|format(overlaps|sum / overlaps|length) }}
+            </div>
+            <div class="stat-label">Avg Negative Overlap</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pair-by-Pair Analysis -->
+    <h2>Contrastive Pairs</h2>
+
+    {% for pair in pairs %}
+    <div class="card">
+        <div class="card-header">
+            Pair {{ loop.index0 }} ({{ pair.format_type }})
+            {% if validation_results and validation_results[loop.index0] %}
+                {% set quality = validation_results[loop.index0].quality_score %}
+                {% if quality >= 2.0 %}
+                    <span class="badge badge-success">Quality: {{ "%.2f"|format(quality) }}</span>
+                {% elif quality >= 1.0 %}
+                    <span class="badge badge-warning">Quality: {{ "%.2f"|format(quality) }}</span>
+                {% else %}
+                    <span class="badge badge-error">Quality: {{ "%.2f"|format(quality) }}</span>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Contrastive Analysis Section (Shared) -->
+        {% if validation_results and validation_results[loop.index0] %}
+        <div class="contrastive-analysis-section">
+            <h3>Contrastive Direction Analysis (Steering Vector: Positive - Negative)</h3>
+            <p class="metric-explanation">
+                <span class="info-tooltip" data-tooltip="Features aligned with the direction that distinguishes these classes. Positive similarity = steering toward positive class, negative similarity = steering toward negative class.">ⓘ</span>
+                SAE features aligned with the steering vector computed from activation difference
+            </p>
+
+            <div class="contrastive-columns">
+                <!-- Positive Direction Features -->
+                <div class="contrastive-column">
+                    <h4>→ Positive Direction</h4>
+                    <p class="direction-label">Features steering toward: {{ config.concept.positive_class|capitalize if config else 'Positive Class' }}</p>
+                    {% if validation_results[loop.index0].contrastive_positive_features %}
+                    <ul class="feature-list">
+                        {% for feature in validation_results[loop.index0].contrastive_positive_features[:10] %}
+                        <li class="feature-item">
+                            <span class="feature-label">{{ feature.label }}</span>
+                            <span class="feature-strength positive-direction">
+                                +{{ "%.3f"|format(feature.cosine_similarity) }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="no-data-message">No contrastive data available</p>
+                    {% endif %}
+                </div>
+
+                <!-- Negative Direction Features -->
+                <div class="contrastive-column">
+                    <h4>→ Negative Direction</h4>
+                    <p class="direction-label">Features steering toward: {{ config.concept.negative_class|capitalize if config else 'Negative Class' }}</p>
+                    {% if validation_results[loop.index0].contrastive_negative_features %}
+                    <ul class="feature-list">
+                        {% for feature in validation_results[loop.index0].contrastive_negative_features[:10] %}
+                        <li class="feature-item">
+                            <span class="feature-label">{{ feature.label }}</span>
+                            <span class="feature-strength negative-direction">
+                                {{ "%.3f"|format(feature.cosine_similarity) }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="no-data-message">No contrastive data available</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="pair-container">
+            <!-- Positive Example -->
+            <div class="pair-column">
+                <h4>{{ config.concept.positive_class|capitalize if config else 'Positive' }}</h4>
+
+                {% if pair.format_type == 'qa' %}
+                    <!-- Parse and display as chat -->
+                    {% set parts = pair.positive_text.split('\n', 1) %}
+                    {% if parts|length == 2 %}
+                    <div class="conversation-container">
+                        <div class="message-bubble user-message">
+                            {{ parts[0].replace('User: ', '').strip() }}
+                        </div>
+                        <div class="message-bubble assistant-message">
+                            {{ parts[1].replace('Assistant: ', '').strip() }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="statement-text">{{ pair.positive_text }}</div>
+                    {% endif %}
+                {% else %}
+                    <!-- Statement format -->
+                    <div class="statement-text">{{ pair.positive_text }}</div>
+                {% endif %}
+
+                {% if validation_results and validation_results[loop.index0] %}
+                <div class="feature-section-header">
+                    <span>Per-Example SAE Analysis</span>
+                    <select class="metric-toggle" data-pair-id="{{ loop.index0 }}" data-side="positive">
+                        <option value="cosine" selected>Cosine Similarity</option>
+                        <option value="sparse">Sparse Codes</option>
+                    </select>
+                </div>
+
+                <!-- Cosine Similarity Features (Default) -->
+                <div class="feature-display feature-cosine-positive-{{ loop.index0 }}">
+                    <div class="metric-explanation">
+                        <span class="info-tooltip" data-tooltip="Cosine similarity: alignment between activation vector and SAE decoder direction (-1 to 1, higher = stronger alignment)">ⓘ</span>
+                        Showing cosine similarity values
+                    </div>
+                    {% if validation_results[loop.index0].cosine_positive_features %}
+                    <ul class="feature-list">
+                        {% for feature in validation_results[loop.index0].cosine_positive_features[:10] %}
+                        <li class="feature-item">
+                            <span class="feature-label">{{ feature.label }}</span>
+                            <span class="feature-strength">
+                                {{ "%.3f"|format(feature.cosine_similarity) }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="no-data-message">No cosine similarity data available</p>
+                    {% endif %}
+                </div>
+
+                <!-- Sparse Code Features -->
+                <div class="feature-display feature-sparse-positive-{{ loop.index0 }}" style="display: none;">
+                    <div class="metric-explanation">
+                        <span class="info-tooltip" data-tooltip="Activation strength: how strongly each interpretable pattern activated in the SAE (from Goodfire API)">ⓘ</span>
+                        Showing sparse code activation strengths
+                    </div>
+                    {% if validation_results[loop.index0].positive_features %}
+                    <ul class="feature-list">
+                        {% for feature in validation_results[loop.index0].positive_features[:10] %}
+                        <li class="feature-item">
+                            <span class="feature-label">{{ feature.label }}</span>
+                            <span class="feature-strength">
+                                {{ "%.3f"|format(feature.activation_strength) if feature.activation_strength else 'N/A' }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="no-data-message">No sparse code data available (Goodfire API may be unavailable)</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Activation Heatmap for Positive -->
+                {% if pair.has_activations %}
+                <button class="toggle-heatmap-btn" onclick="toggleHeatmap('{{ loop.index0 }}', 'positive')">
+                    Show Token-Level Activations
+                </button>
+                <div class="heatmap-container" id="heatmap-container-{{ loop.index0 }}-positive" style="display: none;">
+                    <h5 style="margin-bottom: 1rem;">Token-Level Activations</h5>
+                    <div id="heatmap-{{ loop.index0 }}-positive" class="heatmap-placeholder">
+                        Loading activation data...
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Negative Example -->
+            <div class="pair-column">
+                <h4>{{ config.concept.negative_class|capitalize if config else 'Negative' }}</h4>
+
+                {% if pair.format_type == 'qa' %}
+                    <!-- Parse and display as chat -->
+                    {% set parts = pair.negative_text.split('\n', 1) %}
+                    {% if parts|length == 2 %}
+                    <div class="conversation-container">
+                        <div class="message-bubble user-message">
+                            {{ parts[0].replace('User: ', '').strip() }}
+                        </div>
+                        <div class="message-bubble assistant-message">
+                            {{ parts[1].replace('Assistant: ', '').strip() }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="statement-text">{{ pair.negative_text }}</div>
+                    {% endif %}
+                {% else %}
+                    <!-- Statement format -->
+                    <div class="statement-text">{{ pair.negative_text }}</div>
+                {% endif %}
+
+                {% if validation_results and validation_results[loop.index0] %}
+                <div class="feature-section-header">
+                    <span>Per-Example SAE Analysis</span>
+                    <select class="metric-toggle" data-pair-id="{{ loop.index0 }}" data-side="negative">
+                        <option value="cosine" selected>Cosine Similarity</option>
+                        <option value="sparse">Sparse Codes</option>
+                    </select>
+                </div>
+
+                <!-- Cosine Similarity Features (Default) -->
+                <div class="feature-display feature-cosine-negative-{{ loop.index0 }}">
+                    <div class="metric-explanation">
+                        <span class="info-tooltip" data-tooltip="Cosine similarity: alignment between activation vector and SAE decoder direction (-1 to 1, higher = stronger alignment)">ⓘ</span>
+                        Showing cosine similarity values
+                    </div>
+                    {% if validation_results[loop.index0].cosine_negative_features %}
+                    <ul class="feature-list">
+                        {% for feature in validation_results[loop.index0].cosine_negative_features[:10] %}
+                        <li class="feature-item">
+                            <span class="feature-label">{{ feature.label }}</span>
+                            <span class="feature-strength">
+                                {{ "%.3f"|format(feature.cosine_similarity) }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="no-data-message">No cosine similarity data available</p>
+                    {% endif %}
+                </div>
+
+                <!-- Sparse Code Features -->
+                <div class="feature-display feature-sparse-negative-{{ loop.index0 }}" style="display: none;">
+                    <div class="metric-explanation">
+                        <span class="info-tooltip" data-tooltip="Activation strength: how strongly each interpretable pattern activated in the SAE (from Goodfire API)">ⓘ</span>
+                        Showing sparse code activation strengths
+                    </div>
+                    {% if validation_results[loop.index0].negative_features %}
+                    <ul class="feature-list">
+                        {% for feature in validation_results[loop.index0].negative_features[:10] %}
+                        <li class="feature-item">
+                            <span class="feature-label">{{ feature.label }}</span>
+                            <span class="feature-strength">
+                                {{ "%.3f"|format(feature.activation_strength) if feature.activation_strength else 'N/A' }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="no-data-message">No sparse code data available (Goodfire API may be unavailable)</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Activation Heatmap for Negative -->
+                {% if pair.has_activations %}
+                <button class="toggle-heatmap-btn" onclick="toggleHeatmap('{{ loop.index0 }}', 'negative')">
+                    Show Token-Level Activations
+                </button>
+                <div class="heatmap-container" id="heatmap-container-{{ loop.index0 }}-negative" style="display: none;">
+                    <h5 style="margin-bottom: 1rem;">Token-Level Activations</h5>
+                    <div id="heatmap-{{ loop.index0 }}-negative" class="heatmap-placeholder">
+                        Loading activation data...
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Load heatmaps -->
+    {% if pairs[0].has_activations %}
+    <script>
+        // Load activation heatmaps
+        {% for pair in pairs %}
+        {% if pair.has_activations %}
+        // Positive example
+        fetch('/api/activation/{{ timestamp }}/{{ loop.index0 }}/positive')
+            .then(response => response.json())
+            .then(data => {
+                const trace = {
+                    z: [data.token_means],
+                    type: 'heatmap',
+                    colorscale: 'Viridis',
+                    showscale: true
+                };
+                const layout = {
+                    title: `Token Activations (Mean across ${data.hidden_dim} dimensions)`,
+                    xaxis: { title: 'Token Index' },
+                    yaxis: { showticklabels: false },
+                    height: 150,
+                    margin: { l: 50, r: 50, t: 50, b: 50 }
+                };
+                Plotly.newPlot('heatmap-{{ loop.index0 }}-positive', [trace], layout, {responsive: true});
+            });
+
+        // Negative example
+        fetch('/api/activation/{{ timestamp }}/{{ loop.index0 }}/negative')
+            .then(response => response.json())
+            .then(data => {
+                const trace = {
+                    z: [data.token_means],
+                    type: 'heatmap',
+                    colorscale: 'Viridis',
+                    showscale: true
+                };
+                const layout = {
+                    title: `Token Activations (Mean across ${data.hidden_dim} dimensions)`,
+                    xaxis: { title: 'Token Index' },
+                    yaxis: { showticklabels: false },
+                    height: 150,
+                    margin: { l: 50, r: 50, t: 50, b: 50 }
+                };
+                Plotly.newPlot('heatmap-{{ loop.index0 }}-negative', [trace], layout, {responsive: true});
+            });
+        {% endif %}
+        {% endfor %}
+    </script>
+    {% endif %}
+
+    <!-- Metric Toggle JavaScript -->
+    <script>
+        // Add event listeners to all metric toggle dropdowns
+        document.querySelectorAll('.metric-toggle').forEach(toggle => {
+            toggle.addEventListener('change', function(e) {
+                const pairId = this.dataset.pairId;
+                const side = this.dataset.side;
+                const metricType = this.value;
+
+                // Find the corresponding feature displays
+                const cosineDiv = document.querySelector(`.feature-cosine-${side}-${pairId}`);
+                const sparseDiv = document.querySelector(`.feature-sparse-${side}-${pairId}`);
+
+                // Toggle visibility
+                if (metricType === 'cosine') {
+                    cosineDiv.style.display = 'block';
+                    sparseDiv.style.display = 'none';
+                } else {
+                    cosineDiv.style.display = 'none';
+                    sparseDiv.style.display = 'block';
+                }
+            });
+        });
+
+        // Toggle heatmap visibility
+        function toggleHeatmap(pairId, side) {
+            const container = document.getElementById(`heatmap-container-${pairId}-${side}`);
+            const button = event.target;
+
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                button.textContent = 'Hide Token-Level Activations';
+            } else {
+                container.style.display = 'none';
+                button.textContent = 'Show Token-Level Activations';
+            }
+        }
+
+        // Delete run and redirect to index
+        function deleteRunAndRedirect(timestamp) {
+            if (confirm(`Are you sure you want to delete run ${timestamp}? This action cannot be undone.`)) {
+                fetch(`/delete/${timestamp}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`Successfully deleted run ${timestamp}`);
+                        window.location.href = '/';
+                    } else {
+                        alert(`Error: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    alert(`Error deleting run: ${error}`);
+                });
+            }
+        }
+    </script>
+</body>
+</html>
