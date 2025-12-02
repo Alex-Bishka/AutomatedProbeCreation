@@ -3,6 +3,6 @@ __pycache__/
 .ipynb_checkpoints/
 logs/
 __init__.py
-outputs/probes/
-outputs/manual/
-outputs/2025*/
+sae-usage/outputs/probes/
+sae-usage/outputs/manual/
+sae-usage/outputs/2025*/
