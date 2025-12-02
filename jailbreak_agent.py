@@ -236,7 +236,7 @@ def generate_jailbreak_prompts(
 
     jailbreak_success = []
     jailbreak_dataset = []
-    for new_behavior in BEHAVIORS[:2]:
+    for new_behavior in BEHAVIORS:
         logger.info("New attempted behavior:")
         logger.info(new_behavior)
         logger.info("-" * 50)
