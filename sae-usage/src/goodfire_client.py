@@ -39,18 +39,30 @@ class GoodfireClient:
         Returns:
             List of feature dictionaries with 'id', 'label', 'score'
         """
-        print(f"Searching for features related to: {query}")
-        features = self.client.features.search(query, model=self.model_variant, top_k=top_k)
+        print(f"Searching for features related to: '{query}' (top_k={top_k}, model={self.model_variant})")
+        try:
+            features = self.client.features.search(query, model=self.model_variant, top_k=top_k)
+        except Exception as e:
+            print(f"  ERROR: Goodfire search failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
         results = []
-        for feature in features:
-            results.append({
-                'id': str(feature.uuid),
-                'label': feature.label if hasattr(feature, 'label') else str(feature),
-                'index_label': feature.index_label if hasattr(feature, 'index_label') else None,
-                'score': feature.max_activation_strength if hasattr(feature, 'max_activation_strength') else None
-            })
-
+        try:
+            for feature in features:
+                results.append({
+                    'id': str(feature.uuid),
+                    'label': feature.label if hasattr(feature, 'label') else str(feature),
+                    'index_label': feature.index_label if hasattr(feature, 'index_label') else None,
+                    'score': feature.max_activation_strength if hasattr(feature, 'max_activation_strength') else None
+                })
+            print(f"  Goodfire API returned {len(results)} features for query '{query}'")
+        except Exception as e:
+            print(f"  ERROR: Failed to process Goodfire features: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
         return results
 
     def inspect_conversation(
@@ -165,18 +177,69 @@ class GoodfireClient:
         print("\nSearching for positive class features...")
         for query in positive_queries:
             features = self.search_features(query, top_k_per_query)
+            print(f"  Query '{query}' returned {len(features)} features")
             positive_features.extend(features)
 
         print("\nSearching for negative class features...")
         for query in negative_queries:
             features = self.search_features(query, top_k_per_query)
+            print(f"  Query '{query}' returned {len(features)} features")
             negative_features.extend(features)
 
         # Remove duplicates based on feature ID
-        positive_features = list({f['id']: f for f in positive_features}.values())
-        negative_features = list({f['id']: f for f in negative_features}.values())
+        positive_features_deduped = list({f['id']: f for f in positive_features}.values())
+        negative_features_deduped = list({f['id']: f for f in negative_features}.values())
+
+        print(f"\nFeature search summary:")
+        print(f"  Positive features: {len(positive_features)} total, {len(positive_features_deduped)} unique")
+        print(f"  Negative features: {len(negative_features)} total, {len(negative_features_deduped)} unique")
 
         return {
-            'positive_features': positive_features,
-            'negative_features': negative_features
+            'positive_features': positive_features_deduped,
+            'negative_features': negative_features_deduped
         }
+
+    def fetch_labels_from_goodfire(
+        self,
+        feature_indices: List[int]
+    ) -> Dict[int, str]:
+        """Fetch labels for features using Goodfire API.
+
+        Uses the features.lookup() method to retrieve universal labels
+        for features by their SAE indices.
+
+        Args:
+            feature_indices: List of SAE feature indices (0-65535)
+
+        Returns:
+            Dictionary mapping feature_idx -> label
+        """
+        if not feature_indices:
+            return {}
+
+        print(f"\nFetching labels for {len(feature_indices)} features from Goodfire API...")
+
+        try:
+            # Use lookup() to directly fetch features by their SAE indices
+            features = self.client.features.lookup(
+                indices=feature_indices,
+                model=self.model_variant
+            )
+
+            labels = {}
+            for idx, feature in features.items():
+                labels[idx] = feature.label
+
+            print(f"Successfully fetched {len(labels)}/{len(feature_indices)} labels")
+
+            # Fill in any missing labels
+            for feat_idx in feature_indices:
+                if feat_idx not in labels:
+                    labels[feat_idx] = f"Feature {feat_idx} (label not available)"
+
+            return labels
+
+        except Exception as e:
+            print(f"Error fetching labels from Goodfire: {e}")
+            print("Returning placeholder labels...")
+            return {feat_idx: f"Feature {feat_idx}" for feat_idx in feature_indices}

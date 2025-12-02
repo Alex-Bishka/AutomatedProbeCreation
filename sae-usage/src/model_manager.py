@@ -98,6 +98,95 @@ class ModelManager:
 
         return response
 
+    def generate_with_steering(
+        self,
+        messages: List[Dict[str, str]],
+        feature_direction: np.ndarray,
+        steering_strength: float,
+        layer: int = 19,
+        max_new_tokens: int = 256,
+        temperature: float = 0.7
+    ) -> str:
+        """Generate text with steering vector applied during forward pass.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            feature_direction: SAE decoder direction to steer with, shape [hidden_dim]
+            steering_strength: Multiplier for steering vector (positive or negative)
+            layer: Layer to apply steering at
+            max_new_tokens: Maximum new tokens to generate
+            temperature: Sampling temperature
+
+        Returns:
+            Generated response text with steering applied
+        """
+        # Get the target layer first to determine its device
+        target_layer = self.model.model.layers[layer]
+
+        # Get device from the layer's first parameter (works with device_map="auto")
+        layer_device = next(target_layer.parameters()).device
+
+        # Convert feature direction to tensor on the layer's device
+        # Don't set dtype here - will match hidden states dtype in the hook
+        feature_direction_tensor = torch.from_numpy(feature_direction).to(layer_device)
+
+        # Define hook function to add steering vector
+        def steering_hook(module, input, output):
+            """Add steering vector to residual stream output."""
+            # output is a tuple: (hidden_states,) for LlamaDecoderLayer
+            if isinstance(output, tuple):
+                # Extract hidden states (first element)
+                hidden_states = output[0]
+                # Ensure steering vector matches device AND dtype of hidden states
+                steering_vec = feature_direction_tensor.to(device=hidden_states.device, dtype=hidden_states.dtype)
+                # Add steering: shape [batch, seq_len, hidden_dim] + [hidden_dim]
+                modified_hidden = hidden_states + steering_strength * steering_vec
+                # Return tuple with modified hidden states
+                return (modified_hidden,) + output[1:]
+            else:
+                # Fallback for non-tuple output
+                steering_vec = feature_direction_tensor.to(device=output.device, dtype=output.dtype)
+                return output + steering_strength * steering_vec
+
+        # Register hook on the specified layer
+        # For HuggingFace Llama models: model.model.layers[layer_idx]
+        hook_handle = target_layer.register_forward_hook(steering_hook)
+
+        try:
+            # Format using chat template
+            prompt = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+
+            inputs = self.tokenizer(
+                prompt,
+                return_tensors="pt",
+                truncation=True,
+                max_length=self.max_length
+            ).to(self.model.device)
+
+            # Generate with steering applied
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
+
+            # Extract only the generated tokens (not the prompt)
+            generated_tokens = outputs[0][inputs.input_ids.shape[1]:]
+            response = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+
+            return response
+
+        finally:
+            # Always remove hook to prevent memory leaks
+            hook_handle.remove()
+
     def extract_activations(
         self,
         messages: List[Dict[str, str]],
@@ -214,3 +303,25 @@ class ModelManager:
             layer_activations = outputs.hidden_states[layer + 1][0].cpu().numpy()
 
         return layer_activations
+
+    def free_gpu_memory(self) -> None:
+        """Free GPU memory by moving model to CPU and clearing cache.
+
+        This is useful for sequential GPU usage, e.g., after extracting
+        activations with the model, free GPU for other components like SAE decoder.
+        """
+        print("Freeing GPU memory from model...")
+        if hasattr(self, 'model'):
+            # Move model to CPU
+            self.model = self.model.to('cpu')
+            print("  Model moved to CPU")
+
+        # Clear CUDA cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print("  GPU cache cleared")
+
+            # Print GPU memory stats
+            allocated = torch.cuda.memory_allocated() / 1024**3
+            reserved = torch.cuda.memory_reserved() / 1024**3
+            print(f"  GPU memory: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved")

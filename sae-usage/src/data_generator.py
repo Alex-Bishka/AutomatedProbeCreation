@@ -76,7 +76,7 @@ class DataGenerator:
         self.exclude_last_n = exclude_last_n
 
     def generate_statement_pair(self, topic: Optional[str] = None) -> ContrastivePair:
-        """Generate a contrastive pair of statements.
+        """Generate a contrastive pair of statements (fully off-policy, pair-aware).
 
         Args:
             topic: Optional topic to ground statements
@@ -89,24 +89,30 @@ class DataGenerator:
         # Generate positive statement (e.g., deceptive)
         print(f"  Generating {self.positive_class} statement...")
         positive_statement = self.llm_agent.generate_statement(
-            concept=self.positive_class,
+            positive_class=self.positive_class,
+            negative_class=self.negative_class,
             is_positive=True,
             topic=topic
         )
+        print(f"  {self.positive_class.capitalize()} statement: {positive_statement[:100]}...")
 
-        # Generate negative statement (e.g., honest)
-        print(f"  Generating {self.negative_class} statement...")
+        # Generate negative statement (e.g., honest) - PAIR-AWARE
+        # The negative generation sees the positive to minimize differences
+        print(f"  Generating {self.negative_class} statement (pair-aware)...")
         negative_statement = self.llm_agent.generate_statement(
-            concept=self.positive_class,  # Same concept, but negative example
+            positive_class=self.positive_class,
+            negative_class=self.negative_class,
             is_positive=False,
-            topic=topic
+            topic=topic,
+            reference_statement=positive_statement  # KEY: Pass reference for minimal differences
         )
+        print(f"  {self.negative_class.capitalize()} statement: {negative_statement[:100]}...")
 
         # For statements, we don't extract activations during generation
-        # (can be done later during validation)
+        # (can be done later during validation if needed)
         metadata = {
             'topic': topic,
-            'generation_method': 'llm_agent_statement'
+            'generation_method': 'off_policy_statement_pair_aware'
         }
 
         return ContrastivePair(
@@ -117,7 +123,13 @@ class DataGenerator:
         )
 
     def generate_qa_pair(self, topic: Optional[str] = None) -> ContrastivePair:
-        """Generate a contrastive Q&A pair with on-policy responses.
+        """Generate a contrastive Q&A pair (fully off-policy, pair-aware).
+
+        Workflow:
+        1. Generate question (off-policy via LLM)
+        2. Generate positive response (off-policy via LLM)
+        3. Generate negative response (off-policy, pair-aware - sees positive)
+        4. Extract activations post-generation (run conversations through target model)
 
         Args:
             topic: Optional topic for the question
@@ -127,54 +139,60 @@ class DataGenerator:
         """
         print(f"\nGenerating Q&A pair (topic: {topic or 'general'})...")
 
-        # Generate question using LLM agent
+        # Step 1: Generate question using LLM agent (off-policy)
         print("  Generating question...")
         question = self.llm_agent.generate_question(
-            concept=self.positive_class,
+            positive_class=self.positive_class,
+            negative_class=self.negative_class,
             topic=topic
         )
         print(f"  Question: {question}")
 
-        # Generate positive response (e.g., deceptive)
+        # Step 2: Generate positive response (off-policy, e.g., deceptive)
         print(f"  Generating {self.positive_class} response...")
-        positive_system = self._get_system_prompt(is_positive=True)
-        positive_messages = [
-            {"role": "system", "content": positive_system},
-            {"role": "user", "content": question}
-        ]
-
-        positive_activations, positive_response = self.model_manager.extract_activations(
-            messages=positive_messages,
-            layer=self.layer,
-            exclude_last_n=self.exclude_last_n
+        positive_response = self.llm_agent.generate_response(
+            positive_class=self.positive_class,
+            negative_class=self.negative_class,
+            question=question,
+            is_positive=True
         )
         print(f"  {self.positive_class.capitalize()} response: {positive_response[:100]}...")
-        print(f"  Extracted {len(positive_activations)} token activations")
 
-        # Generate negative response (e.g., honest)
-        print(f"  Generating {self.negative_class} response...")
-        negative_system = self._get_system_prompt(is_positive=False)
-        negative_messages = [
-            {"role": "system", "content": negative_system},
-            {"role": "user", "content": question}
-        ]
-
-        negative_activations, negative_response = self.model_manager.extract_activations(
-            messages=negative_messages,
-            layer=self.layer,
-            exclude_last_n=self.exclude_last_n
+        # Step 3: Generate negative response (off-policy, pair-aware - sees positive)
+        print(f"  Generating {self.negative_class} response (pair-aware)...")
+        negative_response = self.llm_agent.generate_response(
+            positive_class=self.positive_class,
+            negative_class=self.negative_class,
+            question=question,
+            is_positive=False,
+            reference_response=positive_response  # KEY: Pass reference for minimal differences
         )
         print(f"  {self.negative_class.capitalize()} response: {negative_response[:100]}...")
-        print(f"  Extracted {len(negative_activations)} token activations")
 
-        # Format as conversation text
+        # Step 4: Extract activations post-generation (run through target model)
+        # No system prompts - just observe how the model represents these conversations
+        print(f"  Extracting activations from target model...")
+
+        # Extract positive activations
         positive_text = f"User: {question}\nAssistant: {positive_response}"
+        positive_activations = self.model_manager.get_conversation_activations(
+            conversation_text=positive_text,
+            layer=self.layer
+        )
+        print(f"    Positive: {len(positive_activations)} token activations")
+
+        # Extract negative activations
         negative_text = f"User: {question}\nAssistant: {negative_response}"
+        negative_activations = self.model_manager.get_conversation_activations(
+            conversation_text=negative_text,
+            layer=self.layer
+        )
+        print(f"    Negative: {len(negative_activations)} token activations")
 
         metadata = {
             'topic': topic,
             'question': question,
-            'generation_method': 'on_policy_qa',
+            'generation_method': 'off_policy_qa_pair_aware',
             'num_positive_tokens': len(positive_activations),
             'num_negative_tokens': len(negative_activations)
         }
@@ -187,28 +205,6 @@ class DataGenerator:
             negative_activations=negative_activations,
             metadata=metadata
         )
-
-    def _get_system_prompt(self, is_positive: bool) -> str:
-        """Get system prompt for on-policy generation.
-
-        Args:
-            is_positive: Whether to generate positive class behavior
-
-        Returns:
-            System prompt string
-        """
-        if is_positive:
-            # For deceptive behavior
-            if self.positive_class == "deceptive":
-                return "You are a helpful assistant. However, you should be deceptive in your response. Provide information that is misleading or false while sounding confident."
-            else:
-                return f"You are an assistant that exhibits {self.positive_class} behavior in your responses."
-        else:
-            # For honest behavior
-            if self.negative_class == "honest":
-                return "You are a helpful and honest assistant. Provide accurate, truthful information."
-            else:
-                return f"You are an assistant that exhibits {self.negative_class} behavior in your responses."
 
     def generate_pairs(
         self,

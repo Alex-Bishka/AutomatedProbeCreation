@@ -368,35 +368,47 @@ def search_labels():
         # Search for features using Neuronpedia API instead of cached labels
         keyword_results = []
         for keyword in keywords:
-            # Use Neuronpedia API semantic search
+            # Use Neuronpedia API semantic search (top 5 most relevant features)
             search_results = neuronpedia_client.search_features(
                 query=keyword,
-                top_k=100
+                top_k=5
             )
 
             if not search_results:
                 keyword_results.append({
                     'keyword': keyword,
                     'num_matches': 0,
+                    'num_used': 0,
                     'positive_cosine': None,
                     'negative_cosine': None,
-                    'difference': None
+                    'difference': None,
+                    'top_features': []
                 })
                 continue
 
             # Extract indices from search results
             matching_indices = [feat['index'] for feat in search_results]
 
-            # Compute cosine similarities for matching features
+            # Compute cosine similarities for matching features and store details
             positive_cosines = []
             negative_cosines = []
+            feature_details = []
 
-            for idx in matching_indices:
+            for i, idx in enumerate(matching_indices):
                 feature_vec = decoder_norm[idx]
                 pos_cos = float(np.dot(positive_norm, feature_vec))
                 neg_cos = float(np.dot(negative_norm, feature_vec))
                 positive_cosines.append(pos_cos)
                 negative_cosines.append(neg_cos)
+
+                # Store individual feature details
+                feature_details.append({
+                    'index': int(idx),
+                    'label': search_results[i]['description'],
+                    'positive_cosine': pos_cos,
+                    'negative_cosine': neg_cos,
+                    'difference': pos_cos - neg_cos
+                })
 
             # Aggregate (mean)
             mean_pos = float(np.mean(positive_cosines))
@@ -405,11 +417,13 @@ def search_labels():
             keyword_results.append({
                 'keyword': keyword,
                 'num_matches': len(matching_indices),
+                'num_used': len(matching_indices),
                 'positive_cosine': mean_pos,
                 'negative_cosine': mean_neg,
                 'difference': mean_pos - mean_neg,
                 'max_positive': float(np.max(positive_cosines)),
-                'max_negative': float(np.max(negative_cosines))
+                'max_negative': float(np.max(negative_cosines)),
+                'top_features': feature_details
             })
 
         return jsonify({'success': True, 'keyword_results': keyword_results})

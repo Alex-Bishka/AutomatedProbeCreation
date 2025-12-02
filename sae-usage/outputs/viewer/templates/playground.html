@@ -445,14 +445,60 @@
     function displayLabelTracking(results) {
         const tbody = document.getElementById('labelTrackingBody');
         tbody.innerHTML = results.map(r => `
-            <tr>
-                <td><strong>${r.keyword}</strong></td>
-                <td>${r.num_matches || 'N/A'}</td>
+            <tr class="keyword-row" onclick="toggleFeatureDetails('${r.keyword}')" style="cursor: pointer;" title="Click to see feature details">
+                <td><strong><span id="arrow-${r.keyword}">▶</span> ${r.keyword}</strong></td>
+                <td>${r.num_used || 'N/A'}${r.num_matches !== r.num_used ? ` of ${r.num_matches}` : ''}</td>
                 <td class="${r.positive_cosine > 0.1 ? 'highlight-positive' : ''}">${r.positive_cosine ? r.positive_cosine.toFixed(3) : 'N/A'}</td>
                 <td class="${r.negative_cosine > 0.1 ? 'highlight-positive' : ''}">${r.negative_cosine ? r.negative_cosine.toFixed(3) : 'N/A'}</td>
                 <td class="${r.difference > 0 ? 'highlight-positive' : 'highlight-negative'}">${r.difference ? (r.difference > 0 ? '+' : '') + r.difference.toFixed(3) : 'N/A'}</td>
             </tr>
+            <tr id="details-${r.keyword}" class="feature-details-row" style="display: none;">
+                <td colspan="5">
+                    <div class="feature-details-content">
+                        ${formatFeatureDetails(r.top_features, r.keyword)}
+                    </div>
+                </td>
+            </tr>
         `).join('');
+    }
+
+    function toggleFeatureDetails(keyword) {
+        const detailsRow = document.getElementById(`details-${keyword}`);
+        const arrow = document.getElementById(`arrow-${keyword}`);
+        if (detailsRow.style.display === 'none') {
+            detailsRow.style.display = 'table-row';
+            arrow.textContent = '▼';
+        } else {
+            detailsRow.style.display = 'none';
+            arrow.textContent = '▶';
+        }
+    }
+
+    function formatFeatureDetails(features, keyword) {
+        if (!features || features.length === 0) {
+            return '<p style="color: #666; padding: 10px;">No feature details available</p>';
+        }
+        return `
+            <div style="padding: 10px; background: rgba(0,0,0,0.02); border-radius: 4px;">
+                <h4 style="margin-top: 0;">Top ${features.length} Features for "${keyword}":</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    ${features.map(f => `
+                        <li style="margin-bottom: 12px; padding: 8px; background: white; border-radius: 4px; border-left: 3px solid ${f.difference > 0 ? 'var(--positive-color)' : 'var(--negative-color)'};">
+                            <div style="font-weight: bold; margin-bottom: 4px;">
+                                <span style="color: #666;">#${f.index}</span>: ${f.label}
+                            </div>
+                            <div style="font-size: 0.9em; color: #666; display: flex; gap: 15px;">
+                                <span class="${f.positive_cosine > 0.1 ? 'highlight-positive' : ''}">Pos: ${f.positive_cosine.toFixed(3)}</span>
+                                <span class="${f.negative_cosine > 0.1 ? 'highlight-positive' : ''}">Neg: ${f.negative_cosine.toFixed(3)}</span>
+                                <span class="${f.difference > 0 ? 'highlight-positive' : 'highlight-negative'}">
+                                    Diff: ${f.difference > 0 ? '+' : ''}${f.difference.toFixed(3)}
+                                </span>
+                            </div>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
     }
 
     async function savePair() {

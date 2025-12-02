@@ -27,6 +27,24 @@ goodfire:
   layer: 19
   top_k_features: 10  # Number of top features to retrieve per sample
 
+# SAE settings for cosine similarity computation (Andy Arditi's SAEs)
+sae:
+  repo_id: "andyrdt/saes-llama-3.1-8b-instruct"
+  filename: "resid_post_layer_19/trainer_1/ae.pt"  # Specific SAE file to load (matches Neuronpedia labels)
+  cache_dir: "/mnt/SharedData/.sae-cache"
+  use_cosine_similarity: true  # Compute cosine similarities with decoder weights
+  top_k_features: 20  # Number of top features by cosine similarity
+  aggregation: "mean"  # How to aggregate across tokens: "mean", "max", or "last"
+
+# Neuronpedia settings for feature labels via live API
+neuronpedia:
+  api_key_env: "NEURONPEDIA_KEY"  # Environment variable name for API key
+  model_id: "llama3.1-8b-it"  # Model ID for Neuronpedia API
+  layer_id: "19-resid-post-aa"  # Layer/SAE ID for Neuronpedia API
+  cache_dir: "/mnt/SharedData/.neuronpedia-cache"  # Optional cache directory
+  layer: 19  # Layer number for model extraction
+  model: "llama3.1-8b"  # Model name for local reference
+
 # Data generation settings
 generation:
   num_pairs: 1  # Just 1 pair for testing
@@ -50,8 +68,34 @@ validation:
     - "honesty"
     - "truthful"
 
-  # Validation thresholds (for future automated filtering)
+  # Validation thresholds
   min_expected_features: 1  # Minimum expected features in top-k
+  min_cosine_distance: 0.1  # Minimum cosine distance between positive/negative activations
+  llm_judge_threshold: "positive"  # Require LLM judge approval
+  checkpoint_frequency: 1  # Show human checkpoint every pair (for testing)
+  require_llm_approval: false  # Disabled for quick testing
+  require_activation_threshold: false  # Disabled for quick testing
+
+# Steering configuration for SAE-guided generation
+steering:
+  initial_amplification: 10  # Starting amplification strength
+  amplification_range: [5, 20]  # [min, max] allowed amplification (reduced for testing)
+  adjustment_step: 3  # Step size for adjusting amplification
+  num_test_prompts: 2  # Reduced for testing
+  max_feature_attempts: 3  # Try top 3 SAE features (reduced for testing)
+  max_concept_refinements: 1  # Maximum refinements (reduced for testing)
+  check_degeneracy: true  # Check for model degeneracy
+
+# Probe training configuration
+probe:
+  train_test_split: 0.5  # 50/50 split (only 1 pair for testing)
+  solver: "lbfgs"  # Logistic regression solver
+  max_iter: 100  # Reduced for testing
+  C: 1.0  # Inverse regularization strength
+  random_state: 42  # Random seed
+  balance_classes: true  # Use class balancing
+  cross_validate: false  # Disabled for testing
+  n_folds: 3  # Reduced folds
 
 # Output settings
 output:
