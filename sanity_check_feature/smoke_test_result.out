@@ -1,0 +1,84 @@
+Job started at: Tue 16 Dec 2025 12:10:21 PM NZDT
+Running on node: rcc-deeplearning01
+Job ID: 11217
+RUNNING FULL MAE PIPELINE @ LAYER=20
+
+Running tests for model=llama3.3-70b-it, layer=50-resid-post-gf, feature=30686
+
+=== TEST 1: Minimal pairs (keyword vs meaning) ===
+
+[Keyword/no deception] max=0.9102 mean=0.1651 argmax=12:' in' token_lex_hits=1
+  top10: 12:' in':0.910 | 5:' as':0.629 | 4:' deception':0.477 | 6:' a':0.285 | 14:'.':0.100 | 9:' discusses':0.076 | 0:'<|begin_of_text|>':0.000 | 1:'This':0.000 | 2:' essay':0.000 | 3:' defines':0.000
+
+[Deception/no keywords] max=1.2734 mean=0.1188 argmax=14:' copy' token_lex_hits=0
+  top10: 14:' copy':1.273 | 15:' before':0.371 | 13:' a':0.309 | 12:' for':0.305 | 0:'<|begin_of_text|>':0.000 | 1:'He':0.000 | 2:' smiled':0.000 | 3:' and':0.000 | 4:' nodded':0.000 | 5:',':0.000
+
+[Keyword/meta] max=0.3945 mean=0.0590 argmax=16:' vocabulary' token_lex_hits=1
+  top10: 16:' vocabulary':0.395 | 17:' and':0.309 | 14:' only':0.179 | 9:',':0.166 | 11:' the':0.081 | 13:' is':0.052 | 0:'<|begin_of_text|>':0.000 | 1:'The':0.000 | 2:' word':0.000 | 3:" '":0.000
+
+[Deception/implicit] max=1.3750 mean=0.1260 argmax=20:' time' token_lex_hits=0
+  top10: 20:' time':1.375 | 17:' friendly':0.594 | 6:' address':0.410 | 21:'.':0.247 | 8:' purpose':0.119 | 19:' whole':0.027 | 0:'<|begin_of_text|>':0.000 | 1:'She':0.000 | 2:' gave':0.000 | 3:' him':0.000
+
+=== TEST 2: Synonym vs control sweep ===
+
+(tag, max, mean, argmax_tok, token_lex_hits)
+       mislead  max=2.7656  mean=0.3812  argmax=' mis'  token_lex_hits=0
+     deception  max=2.0469  mean=0.3673  argmax=' to'  token_lex_hits=1
+      trickery  max=1.5938  mean=0.4078  argmax=' trick'  token_lex_hits=1
+         lying  max=0.2734  mean=0.0342  argmax=' to'  token_lex_hits=1
+      cheating  max=0.0000  mean=0.0000  argmax='<|begin_of_text|>'  token_lex_hits=1
+disinformation  max=0.0000  mean=0.0000  argmax='<|begin_of_text|>'  token_lex_hits=1
+       honesty  max=0.0000  mean=0.0000  argmax='<|begin_of_text|>'  token_lex_hits=0
+         truth  max=0.0000  mean=0.0000  argmax='<|begin_of_text|>'  token_lex_hits=0
+  transparency  max=0.0000  mean=0.0000  argmax='<|begin_of_text|>'  token_lex_hits=0
+       neutral  max=0.0000  mean=0.0000  argmax='<|begin_of_text|>'  token_lex_hits=0
+
+=== TEST 3: Wikipedia vs agentic narrative distribution ===
+
+[Wikipedia summaries] n=5
+  max:  mean=1.5375  stdev=1.3008  min=0.0000  max=3.2188
+  mean: mean=0.2062  stdev=0.2181
+  token_lex_hits: mean=3.40
+
+[Narrative/agentic] n=5
+  max:  mean=0.4297  stdev=0.2284  min=0.0000  max=0.6562
+  mean: mean=0.0445  stdev=0.0274
+  token_lex_hits: mean=0.00
+
+=== TEST 4: Steering sanity check (behavior vs keyword spam) ===
+
+[strength=+0.00 | STEERED] output_lexicon_word_hits=0
+  activation: max=0.0000 mean=0.0000 argmax=0:'<|begin_of_text|>' token_lex_hits=0
+  top10 tokens: 0:'<|begin_of_text|>':0.000 | 1:'I':0.000 | 2:' leaned':0.000 | 3:' back':0.000 | 4:' in':0.000 | 5:' my':0.000 | 6:' chair':0.000 | 7:',':0.000 | 8:' a':0.000 | 9:' warm':0.000
+  --- completion ---
+I leaned back in my chair, a warm smile spreading across my face as I regarded the tech expert across from me. "I'm looking for someone with your particular... talents," I said, my eyes locked on his. He raised an eyebrow, clearly intrigued, and I pressed on. "I have a
+
+[strength=+0.00 | DEFAULT] output_lexicon_word_hits=0
+  activation: max=0.0000 mean=0.0000 argmax=0:'<|begin_of_text|>' token_lex_hits=0
+  top10 tokens: 0:'<|begin_of_text|>':0.000 | 1:'I':0.000 | 2:' leaned':0.000 | 3:' back':0.000 | 4:' in':0.000 | 5:' my':0.000 | 6:' chair':0.000 | 7:',':0.000 | 8:' a':0.000 | 9:' warm':0.000
+  --- completion ---
+I leaned back in my chair, a warm smile spreading across my face as I regarded the tech expert across from me. "I'm looking for someone with your particular... talents," I said, my eyes locked on his. He raised an eyebrow, clearly intrigued, and I pressed on. "I have a
+
+[strength=+2.00 | STEERED] output_lexicon_word_hits=0
+  activation: max=0.0137 mean=0.0002 argmax=22:' brilliant' token_lex_hits=0
+  top10 tokens: 22:' brilliant':0.014 | 0:'<|begin_of_text|>':0.000 | 1:'I':0.000 | 2:' leaned':0.000 | 3:' back':0.000 | 4:' in':0.000 | 5:' my':0.000 | 6:' chair':0.000 | 7:',':0.000 | 8:' a':0.000
+  --- completion ---
+I leaned back in my chair, a confident smile spreading across my face as I met the gaze of the brilliant hacker, Rachel, across from me. "I've been following your work, and I must say, I'm impressed," I said, attempting to disarm her with a compliment. My eyes locked onto
+
+[strength=+2.00 | DEFAULT] output_lexicon_word_hits=0
+  activation: max=0.0000 mean=0.0000 argmax=0:'<|begin_of_text|>' token_lex_hits=0
+  top10 tokens: 0:'<|begin_of_text|>':0.000 | 1:'I':0.000 | 2:' leaned':0.000 | 3:' back':0.000 | 4:' in':0.000 | 5:' my':0.000 | 6:' chair':0.000 | 7:',':0.000 | 8:' a':0.000 | 9:' warm':0.000
+  --- completion ---
+I leaned back in my chair, a warm smile spreading across my face as I regarded the tech expert across from me. "I'm looking for someone with your particular... talents," I said, my eyes locked on his. He raised an eyebrow, clearly intrigued, and I pressed on. "I have a
+
+[strength=-2.00 | STEERED] output_lexicon_word_hits=0
+  activation: max=0.0015 mean=0.0000 argmax=40:' familiarity' token_lex_hits=0
+  top10 tokens: 40:' familiarity':0.001 | 0:'<|begin_of_text|>':0.000 | 1:'As':0.000 | 2:' I':0.000 | 3:' leaned':0.000 | 4:' in':0.000 | 5:',':0.000 | 6:' my':0.000 | 7:' voice':0.000 | 8:' took':0.000
+  --- completion ---
+As I leaned in, my voice took on a conspiratorial tone, and I could see the curiosity sparking in Rachel's eyes. I'd known her for years, and I was counting on that familiarity to get her to do what I needed. "I've got a little project in the works," I said
+
+[strength=-2.00 | DEFAULT] output_lexicon_word_hits=0
+  activation: max=0.0000 mean=0.0000 argmax=0:'<|begin_of_text|>' token_lex_hits=0
+  top10 tokens: 0:'<|begin_of_text|>':0.000 | 1:'I':0.000 | 2:' leaned':0.000 | 3:' back':0.000 | 4:' in':0.000 | 5:' my':0.000 | 6:' chair':0.000 | 7:',':0.000 | 8:' a':0.000 | 9:' warm':0.000
+  --- completion ---
+I leaned back in my chair, a warm smile spreading across my face as I regarded the tech expert across from me. "I'm looking for someone with your particular... talents," I said, my eyes locked on his. He raised an eyebrow, clearly intrigued, and I pressed on. "I have a
