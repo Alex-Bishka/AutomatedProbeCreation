@@ -7,7 +7,7 @@ load_dotenv()
 NEURONPEDIA_API_KEY = os.getenv("NEURONPEDIA_KEY")
 API_URL = "https://www.neuronpedia.org/api/explanation/search"
 
-def get_semantically_similar_features(text_snippet, model="llama3.3-70b-it"):
+def get_semantically_similar_features(text_snippet, model="llama3.3-70b-it", topk=5):
     """
     Asks Neuronpedia: 'Which SAE features have explanations that match this text?'
     """
@@ -32,7 +32,7 @@ def get_semantically_similar_features(text_snippet, model="llama3.3-70b-it"):
         data = response.json()
 
         features = []
-        for item in data['results']:
+        for item in data['results'][:topk]:
             feature_index = int(item['index'])
             description = item['description']
             cosine_sim = item['cosine_similarity']
