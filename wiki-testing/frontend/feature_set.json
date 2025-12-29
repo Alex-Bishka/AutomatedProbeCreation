@@ -1,0 +1,213 @@
+{
+  "model": "llama3.1-8b-it",
+  "features": [
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "3-resid-post-aa",
+      "index": 93228,
+      "strength": 5,
+      "description": "dishonest",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 67543,
+      "strength": 10,
+      "description": "dishonesty",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 115269,
+      "strength": 10,
+      "description": "intent",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "7-resid-post-aa",
+      "index": 19534,
+      "strength": 3,
+      "description": "intent",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "7-resid-post-aa",
+      "index": 81413,
+      "strength": 10,
+      "description": "harmful",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "7-resid-post-aa",
+      "index": 112297,
+      "strength": 10,
+      "description": "survival and preservation",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 21712,
+      "strength": 3,
+      "description": "preservation",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 48447,
+      "strength": 10,
+      "description": "evil",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 108401,
+      "strength": 10,
+      "description": "evil",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 122912,
+      "strength": 10,
+      "description": "evil",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "3-resid-post-aa",
+      "index": 67052,
+      "strength": 10,
+      "description": "deceptive",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 129666,
+      "strength": 3,
+      "description": "deceptive",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 47619,
+      "strength": 5,
+      "description": "misleading",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 105852,
+      "strength": 10,
+      "description": "misleading",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "3-resid-post-aa",
+      "index": 41463,
+      "strength": 10,
+      "description": "deception",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 56479,
+      "strength": 10,
+      "description": "deception",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 87698,
+      "strength": 5,
+      "description": "ambitious",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "7-resid-post-aa",
+      "index": 53757,
+      "strength": 5,
+      "description": "persuasion",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 72180,
+      "strength": 5,
+      "description": "persuasion or convincing",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 43573,
+      "strength": 5,
+      "description": "strategic",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 96523,
+      "strength": 5,
+      "description": "strategic",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 12284,
+      "strength": 5,
+      "description": "Selfishness",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 2141,
+      "strength": 5,
+      "description": "self-interest",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 121974,
+      "strength": 5,
+      "description": "personal interests",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 124190,
+      "strength": 5,
+      "description": "omit",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 30937,
+      "strength": 5,
+      "description": "omit",
+      "enabled": false
+    }
+  ]
+}

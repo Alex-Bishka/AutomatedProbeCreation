@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SAE Steering Scenarios{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SAE Steering Scenarios</h1>
+            <p class="subtitle">A tool for testing sparse autoencoder feature steering on behavioral scenarios</p>
+            <nav>
+                <a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>Dashboard</a>
+                <a href="{{ url_for('features_page') }}" {% if request.endpoint == 'features_page' %}class="active"{% endif %}>Features</a>
+                <a href="{{ url_for('scenarios_page') }}" {% if request.endpoint == 'scenarios_page' %}class="active"{% endif %}>Scenarios</a>
+                <a href="{{ url_for('run_page') }}" {% if request.endpoint == 'run_page' %}class="active"{% endif %}>Run</a>
+                <a href="{{ url_for('runs_page') }}" {% if request.endpoint in ['runs_page', 'run_detail_page'] %}class="active"{% endif %}>Past Runs</a>
+            </nav>
+        </header>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        // Utility functions
+        async function apiCall(url, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            const response = await fetch(url, options);
+            return response.json();
+        }
+
+        function toggleCollapsible(element) {
+            element.classList.toggle('expanded');
+            const content = element.nextElementSibling;
+            content.classList.toggle('show');
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

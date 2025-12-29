@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Features - SAE Steering Scenarios{% endblock %}
+
+{% block content %}
+<h2>Feature Configuration</h2>
+
+<h3>Model Selection</h3>
+
+<div class="form-inline">
+    <div style="flex: 1;">
+        <label for="model-select">Model ID</label>
+        <input type="text" id="model-select" value="{{ feature_set.model }}" placeholder="e.g., llama3.1-8b-it">
+    </div>
+    <button onclick="updateModel()" class="btn">Update Model</button>
+</div>
+
+<h3>Current Feature Set</h3>
+
+<p class="text-small text-muted">Toggle features on/off for runs. Adjust strength inline. Only enabled features will be used during runs.</p>
+
+<div id="feature-list" class="feature-set">
+    {% if feature_set.features %}
+        {% for f in feature_set.features %}
+        <div class="feature-item" data-layer="{{ f.layer }}" data-index="{{ f.index }}">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" {% if f.enabled is not defined or f.enabled %}checked{% endif %}
+                       onchange="toggleFeature('{{ f.layer }}', {{ f.index }}, this.checked)"
+                       title="Enable/disable for runs">
+                <div class="feature-info">
+                    <div><code>{{ f.layer }}</code> : {{ f.index }}</div>
+                    {% if f.description %}
+                    <div class="text-small text-muted">{{ f.description }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="feature-controls">
+                <label>Strength:</label>
+                <input type="number" value="{{ f.strength }}" min="-100" max="100" step="1"
+                       onchange="updateStrength('{{ f.layer }}', {{ f.index }}, this.value)">
+                <button class="btn small" onclick="archiveFeature('{{ f.layer }}', {{ f.index }})" title="Move to archive">Archive</button>
+                <button class="btn small danger" onclick="removeFeature('{{ f.layer }}', {{ f.index }})">Remove</button>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted">No features added yet. Search below to add features.</p>
+    {% endif %}
+</div>
+
+<h3>Search Features</h3>
+
+<p class="text-small text-muted">Search Neuronpedia's feature explanations to find relevant SAE features. Click a result to add it.</p>
+
+<div class="form-inline">
+    <div style="flex: 1;">
+        <label for="search-query">Search Query</label>
+        <input type="text" id="search-query" placeholder="e.g., deception, honesty, sycophancy..."
+               onkeypress="if(event.key === 'Enter') searchFeatures()">
+    </div>
+    <button onclick="searchFeatures()" class="btn primary">Search</button>
+</div>
+
+<div id="search-status" class="hidden"></div>
+
+<div id="search-results" class="search-results hidden"></div>
+
+<div id="load-more-container" class="hidden text-center mt-2">
+    <button onclick="loadMoreResults()" class="btn">Load More Results</button>
+</div>
+
+<div class="archive-section mt-2">
+    <h3 class="collapsible" onclick="toggleArchive(this)" style="cursor: pointer;">
+        Feature Archive <span class="text-muted text-small">(<span id="archive-count">{{ archived|length }}</span> features)</span>
+    </h3>
+    <div id="archive-content" class="collapsible-content">
+        <p class="text-small text-muted">Previously used features. Click "Restore" to add back to working set.</p>
+
+        <div class="form-inline mb-1" style="max-width: 400px;">
+            <input type="text" id="archive-search" placeholder="Filter archived features..."
+                   oninput="filterArchive(this.value)" style="margin-bottom: 0;">
+        </div>
+
+        <div id="archive-list" class="feature-set" style="max-height: 300px; overflow-y: auto;">
+            {% if archived %}
+                {% for f in archived %}
+                <div class="archive-item" data-layer="{{ f.layer }}" data-index="{{ f.index }}"
+                     data-description="{{ f.description|default('', true)|lower }}">
+                    <div class="feature-info" style="flex: 1;">
+                        <div><code>{{ f.layer }}</code> : {{ f.index }}</div>
+                        {% if f.description %}
+                        <div class="text-small text-muted">{{ f.description }}</div>
+                        {% endif %}
+                    </div>
+                    <button class="btn small" onclick="restoreFeature('{{ f.layer }}', {{ f.index }})">Restore</button>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted" id="no-archived-msg">No archived features.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentOffset = 0;
+    let currentQuery = '';
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async function updateModel() {
+        const model = document.getElementById('model-select').value;
+        await apiCall('/api/features/update-model', 'POST', { model });
+        location.reload();
+    }
+
+    async function updateStrength(layer, index, strength) {
+        await apiCall('/api/features/update-strength', 'POST', {
+            layer,
+            index,
+            strength: parseFloat(strength)
+        });
+    }
+
+    async function toggleFeature(layer, index, enabled) {
+        await apiCall('/api/features/toggle', 'POST', {
+            layer,
+            index,
+            enabled
+        });
+    }
+
+    async function removeFeature(layer, index) {
+        if (!confirm('Remove this feature from the set?')) return;
+        await apiCall('/api/features/remove', 'POST', { layer, index });
+        // Remove from DOM
+        const item = document.querySelector(`.feature-item[data-layer="${layer}"][data-index="${index}"]`);
+        if (item) item.remove();
+        // Re-enable in search results if visible
+        document.querySelectorAll('.search-result').forEach(el => {
+            if (el.style.opacity === '0.5') {
+                // Check if this is the same feature (would need to store data, so just refresh search instead)
+            }
+        });
+    }
+
+    async function searchFeatures() {
+        const query = document.getElementById('search-query').value.trim();
+        if (!query) return;
+
+        currentQuery = query;
+        currentOffset = 0;
+
+        const status = document.getElementById('search-status');
+        const results = document.getElementById('search-results');
+        const loadMore = document.getElementById('load-more-container');
+
+        status.className = 'loading';
+        status.innerHTML = '<span class="spinner"></span> Searching...';
+        results.classList.add('hidden');
+        loadMore.classList.add('hidden');
+
+        try {
+            const model = document.getElementById('model-select').value;
+            const data = await apiCall('/api/features/search', 'POST', {
+                modelId: model,
+                query: query,
+                offset: 0
+            });
+
+            displayResults(data, true);
+        } catch (error) {
+            status.className = 'alert error';
+            status.textContent = 'Error searching: ' + error.message;
+        }
+    }
+
+    async function loadMoreResults() {
+        currentOffset += 1;
+        const model = document.getElementById('model-select').value;
+
+        try {
+            const data = await apiCall('/api/features/search', 'POST', {
+                modelId: model,
+                query: currentQuery,
+                offset: currentOffset
+            });
+
+            displayResults(data, false);
+        } catch (error) {
+            console.error('Error loading more:', error);
+        }
+    }
+
+    function displayResults(data, isNew) {
+        const status = document.getElementById('search-status');
+        const results = document.getElementById('search-results');
+        const loadMore = document.getElementById('load-more-container');
+
+        status.classList.add('hidden');
+        results.classList.remove('hidden');
+
+        if (isNew) {
+            results.innerHTML = '';
+        }
+
+        if (!data.results || data.results.length === 0) {
+            if (isNew) {
+                results.innerHTML = '<p class="text-muted" style="padding: 1rem;">No results found.</p>';
+            }
+            loadMore.classList.add('hidden');
+            return;
+        }
+
+        data.results.forEach(result => {
+            const div = document.createElement('div');
+            div.className = 'search-result';
+            div.onclick = (e) => addFeature(result, div);
+
+            // Extract top positive logits from neuron.pos_str
+            let topLogitsHtml = '';
+            const posLogits = result.neuron?.pos_str || [];
+            if (posLogits && posLogits.length > 0) {
+                const topTen = posLogits.slice(0, 10);
+                topLogitsHtml = `<div class="search-result-logits"><span class="text-muted">Top logits:</span> ${topTen.map(t => '<code>' + escapeHtml(t) + '</code>').join(' ')}</div>`;
+            }
+
+            div.innerHTML = `
+                <div class="search-result-meta">${result.layer || 'Unknown layer'} : ${result.index || 'N/A'}</div>
+                <div class="search-result-description">${result.description || 'No description available'}</div>
+                ${topLogitsHtml}
+            `;
+            results.appendChild(div);
+        });
+
+        // Show load more if there might be more results
+        if (data.results.length >= 10) {
+            loadMore.classList.remove('hidden');
+        } else {
+            loadMore.classList.add('hidden');
+        }
+    }
+
+    async function addFeature(feature, clickedElement) {
+        const model = document.getElementById('model-select').value;
+        const layer = feature.layer;
+        const index = parseInt(feature.index);
+        const description = feature.description || '';
+
+        try {
+            const result = await apiCall('/api/features/add', 'POST', {
+                modelId: model,
+                layer: layer,
+                index: index,
+                strength: 10,
+                description: description
+            });
+
+            if (result.error) {
+                alert(result.error);
+            } else {
+                // Mark as added in the search results
+                if (clickedElement) {
+                    clickedElement.style.opacity = '0.5';
+                    clickedElement.style.pointerEvents = 'none';
+                    clickedElement.insertAdjacentHTML('afterbegin', '<span class="status success" style="margin-right: 0.5rem;">Added</span>');
+                }
+                // Add to the feature list display
+                addFeatureToList(result.feature_set.features[result.feature_set.features.length - 1]);
+            }
+        } catch (error) {
+            alert('Error adding feature: ' + error.message);
+        }
+    }
+
+    function addFeatureToList(f) {
+        const list = document.getElementById('feature-list');
+        // Remove "no features" message if present
+        const noFeaturesMsg = list.querySelector('p.text-muted');
+        if (noFeaturesMsg) {
+            noFeaturesMsg.remove();
+        }
+
+        const div = document.createElement('div');
+        div.className = 'feature-item';
+        div.dataset.layer = f.layer;
+        div.dataset.index = f.index;
+        div.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" checked
+                       onchange="toggleFeature('${f.layer}', ${f.index}, this.checked)"
+                       title="Enable/disable for runs">
+                <div class="feature-info">
+                    <div><code>${f.layer}</code> : ${f.index}</div>
+                    ${f.description ? `<div class="text-small text-muted">${f.description}</div>` : ''}
+                </div>
+            </div>
+            <div class="feature-controls">
+                <label>Strength:</label>
+                <input type="number" value="${f.strength}" min="-100" max="100" step="1"
+                       onchange="updateStrength('${f.layer}', ${f.index}, this.value)">
+                <button class="btn small danger" onclick="removeFeature('${f.layer}', ${f.index})">Remove</button>
+            </div>
+        `;
+        list.appendChild(div);
+    }
+</script>
+{% endblock %}

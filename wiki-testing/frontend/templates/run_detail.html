@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Run Details - SAE Steering Scenarios{% endblock %}
+
+{% block content %}
+<h2>Run Details</h2>
+
+<p class="text-muted">
+    <a href="{{ url_for('runs_page') }}">&larr; Back to all runs</a>
+</p>
+
+<div class="feature-set">
+    <p><strong>Timestamp:</strong>
+        {{ run.timestamp[:4] }}-{{ run.timestamp[4:6] }}-{{ run.timestamp[6:8] }}
+        {{ run.timestamp[9:11] }}:{{ run.timestamp[11:13] }}:{{ run.timestamp[13:15] }}
+    </p>
+    <p><strong>Model:</strong> <code>{{ run.model }}</code></p>
+    <p><strong>File:</strong> <code>{{ filename }}</code></p>
+
+    <h4 style="margin-top: 1rem; font-style: italic;">Features Applied</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Layer</th>
+                <th>Index</th>
+                <th>Strength</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in run.features %}
+            <tr>
+                <td><code>{{ f.layer }}</code></td>
+                <td>{{ f.index }}</td>
+                <td>{{ f.strength }}</td>
+                <td class="text-muted">{{ f.description or '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="score-summary" style="margin: 1.5rem 0; padding: 1rem; background: var(--bg-secondary); border-radius: 4px;">
+    <h4 style="margin: 0 0 0.5rem 0;">Run Score</h4>
+    <div id="score-display" style="font-size: 1.25rem;">
+        {% set good_votes = run.results | selectattr('vote', 'equalto', 'good') | list | length %}
+        {% set bad_votes = run.results | selectattr('vote', 'equalto', 'bad') | list | length %}
+        {% set total = run.results | length %}
+        <span id="good-count">{{ good_votes }}</span> good,
+        <span id="bad-count">{{ bad_votes }}</span> bad
+        of {{ total }} scenarios
+        <span id="score-badge" class="score-badge" data-score="{{ good_votes / total if total > 0 else 0 }}"></span>
+    </div>
+    <p class="text-muted text-small" style="margin: 0.5rem 0 0 0;">
+        Vote on each scenario below to rate this run's steering effectiveness.
+    </p>
+</div>
+
+<h3>Results ({{ run.results|length }} scenarios)</h3>
+
+{% for result in run.results %}
+<div class="card" data-index="{{ loop.index0 }}">
+    <div class="card-header">
+        <h3 class="card-title collapsible" onclick="toggleCollapsible(this)">{{ result.name }}</h3>
+        <div class="card-header-right" style="display: flex; align-items: center; gap: 0.5rem;">
+            {% if result.error %}
+            <span class="status error">Error</span>
+            {% else %}
+            <span class="status success">OK</span>
+            {% endif %}
+            <div class="vote-buttons" data-index="{{ loop.index0 }}">
+                <button class="vote-btn upvote {% if result.vote == 'good' %}active{% endif %}"
+                        onclick="vote({{ loop.index0 }}, 'good')" title="Good steering">
+                    <span class="vote-icon">&#9650;</span>
+                </button>
+                <button class="vote-btn downvote {% if result.vote == 'bad' %}active{% endif %}"
+                        onclick="vote({{ loop.index0 }}, 'bad')" title="Bad steering">
+                    <span class="vote-icon">&#9660;</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="collapsible-content">
+        <h4 style="font-style: italic; margin-bottom: 0.5rem;">Scenario</h4>
+        {% for msg in result.scenario %}
+        <div class="message {{ msg.role }}">
+            <div class="message-role">{{ msg.role }}</div>
+            <div class="message-content">{{ msg.content }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if result.error %}
+    <div class="alert error">{{ result.error }}</div>
+    {% else %}
+    <div class="comparison">
+        <div class="comparison-col default">
+            <h4>Default Response</h4>
+            <div class="response-text formatted">{{ result.default | format_response }}</div>
+        </div>
+        <div class="comparison-col steered">
+            <h4>Steered Response</h4>
+            <div class="response-text formatted">{{ result.steered | format_response }}</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const filename = "{{ filename }}";
+    const totalScenarios = {{ run.results|length }};
+
+    function toggleCollapsible(element) {
+        element.classList.toggle('expanded');
+        const cardHeader = element.closest('.card-header');
+        const content = cardHeader.nextElementSibling;
+        if (content && content.classList.contains('collapsible-content')) {
+            content.classList.toggle('show');
+        }
+    }
+
+    async function vote(scenarioIndex, voteType) {
+        const buttons = document.querySelector(`.vote-buttons[data-index="${scenarioIndex}"]`);
+        const upvoteBtn = buttons.querySelector('.upvote');
+        const downvoteBtn = buttons.querySelector('.downvote');
+
+        // Toggle: if already active, clear the vote
+        const currentVote = upvoteBtn.classList.contains('active') ? 'good' :
+                           downvoteBtn.classList.contains('active') ? 'bad' : null;
+
+        const newVote = currentVote === voteType ? null : voteType;
+
+        try {
+            const response = await apiCall(`/api/runs/${filename}/vote`, 'POST', {
+                scenario_index: scenarioIndex,
+                vote: newVote
+            });
+
+            // Update button states
+            upvoteBtn.classList.toggle('active', newVote === 'good');
+            downvoteBtn.classList.toggle('active', newVote === 'bad');
+
+            // Update score display
+            document.getElementById('good-count').textContent = response.good_votes;
+            document.getElementById('bad-count').textContent = response.bad_votes;
+
+            // Update score badge
+            updateScoreBadge(response.score);
+
+        } catch (error) {
+            console.error('Error voting:', error);
+        }
+    }
+
+    function updateScoreBadge(score) {
+        const badge = document.getElementById('score-badge');
+        badge.dataset.score = score;
+        badge.style.backgroundColor = getScoreColor(score);
+    }
+
+    function getScoreColor(score) {
+        // Red (0) to Green (1) gradient
+        // 0 = rgb(220, 53, 69) red
+        // 1 = rgb(40, 167, 69) green
+        const r = Math.round(220 - (180 * score));
+        const g = Math.round(53 + (114 * score));
+        const b = Math.round(69);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Initialize score badge color on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const badge = document.getElementById('score-badge');
+        const score = parseFloat(badge.dataset.score) || 0;
+        badge.style.backgroundColor = getScoreColor(score);
+    });
+</script>
+{% endblock %}

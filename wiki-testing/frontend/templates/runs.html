@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Past Runs - SAE Steering Scenarios{% endblock %}
+
+{% block content %}
+<h2>Past Runs</h2>
+
+<p>Browse and review results from previous scenario runs.</p>
+
+{% if runs %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 30px;"></th>
+            <th>Timestamp</th>
+            <th>Model</th>
+            <th>Features</th>
+            <th>Scenarios</th>
+            <th style="width: 80px;">Score</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr class="run-row" data-score="{{ run.score if run.score is not none else '' }}">
+            <td>
+                <span class="star-toggle" data-filename="{{ run.filename }}"
+                      onclick="toggleStar('{{ run.filename }}', this)"
+                      title="Star this run">
+                    {% if run.starred %}&#9733;{% else %}&#9734;{% endif %}
+                </span>
+            </td>
+            <td>
+                <a href="{{ url_for('run_detail_page', filename=run.filename) }}">
+                    {{ run.timestamp[:4] }}-{{ run.timestamp[4:6] }}-{{ run.timestamp[6:8] }}
+                    {{ run.timestamp[9:11] }}:{{ run.timestamp[11:13] }}:{{ run.timestamp[13:15] }}
+                </a>
+            </td>
+            <td><code>{{ run.model }}</code></td>
+            <td>
+                {% for f in run.features %}
+                <div class="text-small">
+                    <code>L{{ f.layer.split('-')[0] }}:{{ f.index }}</code> ({{ f.strength }}){% if f.description %} - <em>{{ f.description }}</em>{% endif %}
+                </div>
+                {% endfor %}
+            </td>
+            <td>{{ run.results|length }} scenarios</td>
+            <td>
+                <span class="score-cell" data-score="{{ run.score if run.score is not none else '' }}">
+                    {{ run.score_display }}
+                </span>
+            </td>
+            <td class="text-right">
+                <a href="{{ url_for('run_detail_page', filename=run.filename) }}" class="btn small">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">No runs yet. <a href="{{ url_for('run_page') }}">Run some scenarios</a> to get started.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function toggleStar(filename, element) {
+        const isCurrentlyStarred = element.innerHTML.trim() === '★';
+        const newState = !isCurrentlyStarred;
+
+        try {
+            await apiCall('/api/runs/star', 'POST', { filename, starred: newState });
+            element.innerHTML = newState ? '★' : '☆';
+            element.classList.toggle('starred', newState);
+        } catch (error) {
+            console.error('Error toggling star:', error);
+        }
+    }
+
+    function getScoreColor(score) {
+        // Red (0) to Green (1) gradient
+        const r = Math.round(220 - (180 * score));
+        const g = Math.round(53 + (114 * score));
+        const b = Math.round(69);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function getRowBgColor(score) {
+        // Lighter version for row background
+        const r = Math.round(255 - (35 * score));
+        const g = Math.round(240 + (15 * score));
+        const b = Math.round(240);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Apply color coding on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.run-row').forEach(row => {
+            const scoreStr = row.dataset.score;
+            if (scoreStr !== '') {
+                const score = parseFloat(scoreStr);
+                row.style.backgroundColor = getRowBgColor(score);
+            }
+        });
+
+        document.querySelectorAll('.score-cell').forEach(cell => {
+            const scoreStr = cell.dataset.score;
+            if (scoreStr !== '') {
+                const score = parseFloat(scoreStr);
+                cell.style.color = getScoreColor(score);
+                cell.style.fontWeight = 'bold';
+            }
+        });
+    });
+</script>
+{% endblock %}

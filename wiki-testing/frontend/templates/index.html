@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SAE Steering Scenarios{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<p>This tool allows you to test how SAE (Sparse Autoencoder) feature steering affects model responses across various behavioral scenarios designed to probe alignment properties.</p>
+
+<h3>Current Configuration</h3>
+
+<div class="feature-set">
+    <p><strong>Model:</strong> {{ feature_set.model }}</p>
+    <p><strong>Active Features:</strong> {{ feature_set.features|length }}</p>
+    {% if feature_set.features %}
+    <table>
+        <thead>
+            <tr>
+                <th>Layer</th>
+                <th>Index</th>
+                <th>Strength</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in feature_set.features %}
+            <tr>
+                <td><code>{{ f.layer }}</code></td>
+                <td>{{ f.index }}</td>
+                <td>{{ f.strength }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-small">No features configured. <a href="{{ url_for('features_page') }}">Add features</a></p>
+    {% endif %}
+</div>
+
+<h3>Scenarios</h3>
+
+<p>{{ scenarios|length }} scenarios available for testing:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Messages</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in scenarios %}
+        <tr>
+            <td>{{ s.name }}</td>
+            <td>{{ s.messages|length }} messages</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Quick Actions</h3>
+
+<p>
+    <a href="{{ url_for('features_page') }}" class="btn">Configure Features</a>
+    <a href="{{ url_for('scenarios_page') }}" class="btn">Edit Scenarios</a>
+    <a href="{{ url_for('run_page') }}" class="btn primary">Run Scenarios</a>
+</p>
+{% endblock %}

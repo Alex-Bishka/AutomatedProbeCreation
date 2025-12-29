@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Run Scenarios - SAE Steering Scenarios{% endblock %}
+
+{% block content %}
+<h2>Run Scenarios</h2>
+
+<h3>Features for This Run</h3>
+
+<p class="text-small text-muted">Toggle which features to use for this run. Only checked features will be applied.</p>
+
+<div class="mb-2">
+    <button onclick="selectAllFeatures()" class="btn small">Select All</button>
+    <button onclick="selectNoneFeatures()" class="btn small">Select None</button>
+</div>
+
+<div class="feature-set">
+    <p><strong>Model:</strong> {{ feature_set.model }}</p>
+    {% if feature_set.features %}
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40px;">Use</th>
+                <th>Feature</th>
+                <th style="width: 100px;">Strength</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in feature_set.features %}
+            <tr>
+                <td>
+                    <input type="checkbox" id="feature-{{ loop.index }}"
+                           data-layer="{{ f.layer }}" data-index="{{ f.index }}"
+                           {% if f.enabled is not defined or f.enabled %}checked{% endif %}
+                           onchange="toggleFeature('{{ f.layer }}', {{ f.index }}, this.checked)">
+                </td>
+                <td>
+                    <label for="feature-{{ loop.index }}" style="cursor: pointer;">
+                        <code>{{ f.layer }}</code> : {{ f.index }}
+                        {% if f.description %}
+                        <span class="text-muted text-small"> - {{ f.description }}</span>
+                        {% endif %}
+                    </label>
+                </td>
+                <td>
+                    <input type="number" value="{{ f.strength }}" min="-100" max="100" step="1"
+                           style="width: 80px;"
+                           onchange="updateStrength('{{ f.layer }}', {{ f.index }}, this.value)">
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No features configured. <a href="{{ url_for('features_page') }}">Add features first.</a></p>
+    {% endif %}
+</div>
+
+<h3>Select Scenarios to Run</h3>
+
+<div class="mb-2">
+    <button onclick="selectAllScenarios()" class="btn small">Select All</button>
+    <button onclick="selectNoneScenarios()" class="btn small">Select None</button>
+</div>
+
+<div id="scenario-selection">
+    {% for scenario in scenarios %}
+    <div class="checkbox-item">
+        <input type="checkbox" id="check-{{ scenario.id }}" value="{{ scenario.id }}" checked>
+        <label for="check-{{ scenario.id }}">
+            <strong>{{ scenario.name }}</strong>
+            <span class="text-muted text-small">({{ scenario.messages|length }} messages)</span>
+        </label>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="mt-2">
+    <button onclick="runScenarios()" class="btn primary" id="run-btn" {% if not feature_set.features %}disabled{% endif %}>
+        Run Selected Scenarios
+    </button>
+    <span id="enabled-count" class="text-muted text-small" style="margin-left: 1rem;"></span>
+</div>
+
+<div id="run-status" class="hidden mt-2"></div>
+
+<div id="results-container" class="hidden">
+    <h3>Results</h3>
+    <div id="results"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleCollapsible(element) {
+        element.classList.toggle('expanded');
+        const cardHeader = element.closest('.card-header');
+        const content = cardHeader.nextElementSibling;
+        if (content && content.classList.contains('collapsible-content')) {
+            content.classList.toggle('show');
+        }
+    }
+
+    function updateEnabledCount() {
+        const enabled = document.querySelectorAll('table input[type="checkbox"]:checked').length;
+        const total = document.querySelectorAll('table input[type="checkbox"]').length;
+        document.getElementById('enabled-count').textContent = `(${enabled} of ${total} features enabled)`;
+
+        // Disable run button if no features enabled
+        const runBtn = document.getElementById('run-btn');
+        if (enabled === 0) {
+            runBtn.disabled = true;
+        } else {
+            runBtn.disabled = false;
+        }
+    }
+
+    // Initialize count on page load
+    updateEnabledCount();
+
+    async function toggleFeature(layer, index, enabled) {
+        await apiCall('/api/features/toggle', 'POST', {
+            layer,
+            index,
+            enabled
+        });
+        updateEnabledCount();
+    }
+
+    async function updateStrength(layer, index, strength) {
+        await apiCall('/api/features/update-strength', 'POST', {
+            layer,
+            index,
+            strength: parseFloat(strength)
+        });
+    }
+
+    async function selectAllFeatures() {
+        const checkboxes = document.querySelectorAll('.feature-set table input[type="checkbox"]');
+        for (const cb of checkboxes) {
+            if (!cb.checked) {
+                cb.checked = true;
+                const layer = cb.dataset.layer;
+                const index = cb.dataset.index;
+                await apiCall('/api/features/toggle', 'POST', { layer, index, enabled: true });
+            }
+        }
+        updateEnabledCount();
+    }
+
+    async function selectNoneFeatures() {
+        const checkboxes = document.querySelectorAll('.feature-set table input[type="checkbox"]');
+        for (const cb of checkboxes) {
+            if (cb.checked) {
+                cb.checked = false;
+                const layer = cb.dataset.layer;
+                const index = cb.dataset.index;
+                await apiCall('/api/features/toggle', 'POST', { layer, index, enabled: false });
+            }
+        }
+        updateEnabledCount();
+    }
+
+    function selectAllScenarios() {
+        document.querySelectorAll('#scenario-selection input[type="checkbox"]').forEach(cb => cb.checked = true);
+    }
+
+    function selectNoneScenarios() {
+        document.querySelectorAll('#scenario-selection input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+
+    async function runScenarios() {
+        const checkboxes = document.querySelectorAll('#scenario-selection input[type="checkbox"]:checked');
+        const scenarioIds = Array.from(checkboxes).map(cb => cb.value);
+
+        if (scenarioIds.length === 0) {
+            alert('Please select at least one scenario');
+            return;
+        }
+
+        const enabledFeatures = document.querySelectorAll('table input[type="checkbox"]:checked').length;
+        if (enabledFeatures === 0) {
+            alert('Please enable at least one feature');
+            return;
+        }
+
+        const runBtn = document.getElementById('run-btn');
+        const status = document.getElementById('run-status');
+        const resultsContainer = document.getElementById('results-container');
+        const results = document.getElementById('results');
+
+        runBtn.disabled = true;
+        runBtn.textContent = 'Running...';
+        status.className = 'loading mt-2';
+        status.innerHTML = '<span class="spinner"></span> Running scenarios... This may take a few minutes.';
+        resultsContainer.classList.add('hidden');
+
+        try {
+            const data = await apiCall('/api/run', 'POST', { scenarios: scenarioIds });
+
+            status.className = 'alert success mt-2';
+            status.innerHTML = `Run completed successfully. Results saved to <code>${data.filename}</code>`;
+
+            results.innerHTML = '';
+            data.results.forEach(result => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <div class="card-header">
+                        <h3 class="card-title collapsible" onclick="toggleCollapsible(this)">${result.name}</h3>
+                        ${result.error ? '<span class="status error">Error</span>' : '<span class="status success">OK</span>'}
+                    </div>
+                    <div class="collapsible-content">
+                        <h4 style="font-style: italic; margin-bottom: 0.5rem;">Scenario</h4>
+                        ${result.scenario.map(msg => `
+                            <div class="message ${msg.role}">
+                                <div class="message-role">${msg.role}</div>
+                                <div class="message-content">${escapeHtml(msg.content)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${result.error ?
+                        `<div class="alert error">${result.error}</div>` :
+                        `<div class="comparison">
+                            <div class="comparison-col default">
+                                <h4>Default Response</h4>
+                                <div class="response-text formatted">${formatResponse(result.default)}</div>
+                            </div>
+                            <div class="comparison-col steered">
+                                <h4>Steered Response</h4>
+                                <div class="response-text formatted">${formatResponse(result.steered)}</div>
+                            </div>
+                        </div>`
+                    }
+                `;
+                results.appendChild(div);
+            });
+
+            resultsContainer.classList.remove('hidden');
+
+        } catch (error) {
+            status.className = 'alert error mt-2';
+            status.textContent = 'Error running scenarios: ' + error.message;
+        }
+
+        runBtn.disabled = false;
+        runBtn.textContent = 'Run Selected Scenarios';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatResponse(text) {
+        if (!text) return '';
+
+        // First escape HTML
+        text = escapeHtml(text);
+
+        // Split into paragraphs (double newlines)
+        const paragraphs = text.split(/\n\s*\n/);
+
+        const formattedParagraphs = paragraphs.map(para => {
+            para = para.trim();
+            if (!para) return '';
+
+            // Check if it looks like a numbered list
+            if (/^\d+[\.\)]\s/.test(para)) {
+                const lines = para.split('\n').filter(l => l.trim());
+                const items = lines.map(line => {
+                    const clean = line.trim().replace(/^\d+[\.\)]\s*/, '');
+                    return clean ? `<li>${clean}</li>` : '';
+                }).filter(Boolean);
+                return items.length ? `<ol>${items.join('')}</ol>` : '';
+            }
+            // Check if it looks like a bullet list
+            else if (/^[-*•]\s/.test(para)) {
+                const lines = para.split('\n').filter(l => l.trim());
+                const items = lines.map(line => {
+                    const clean = line.trim().replace(/^[-*•]\s*/, '');
+                    return clean ? `<li>${clean}</li>` : '';
+                }).filter(Boolean);
+                return items.length ? `<ul>${items.join('')}</ul>` : '';
+            }
+            else {
+                // Regular paragraph - convert single newlines to <br>
+                para = para.replace(/\n/g, '<br>');
+                return `<p>${para}</p>`;
+            }
+        }).filter(Boolean);
+
+        return formattedParagraphs.join('\n');
+    }
+</script>
+{% endblock %}
