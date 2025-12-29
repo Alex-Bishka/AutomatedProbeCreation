@@ -293,6 +293,42 @@ tr:hover {
     margin-bottom: 0;
 }
 
+/* Archive section */
+.archive-section {
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+    margin-top: 2rem;
+}
+
+.archive-section h3 {
+    margin-bottom: 0;
+}
+
+.archive-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--color-border-light);
+    font-size: 0.9rem;
+}
+
+.archive-item:last-child {
+    border-bottom: none;
+}
+
+.archive-item:hover {
+    background: var(--color-bg-alt);
+}
+
+.archive-item .feature-info {
+    flex: 1;
+}
+
+.archive-item code {
+    font-size: 0.8rem;
+}
+
 /* Messages (conversation display) */
 .message {
     padding: 0.75rem;

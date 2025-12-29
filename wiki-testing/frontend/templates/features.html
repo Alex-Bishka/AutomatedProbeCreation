@@ -138,16 +138,90 @@
     }
 
     async function removeFeature(layer, index) {
-        if (!confirm('Remove this feature from the set?')) return;
+        if (!confirm('Remove this feature permanently?')) return;
         await apiCall('/api/features/remove', 'POST', { layer, index });
         // Remove from DOM
         const item = document.querySelector(`.feature-item[data-layer="${layer}"][data-index="${index}"]`);
         if (item) item.remove();
-        // Re-enable in search results if visible
-        document.querySelectorAll('.search-result').forEach(el => {
-            if (el.style.opacity === '0.5') {
-                // Check if this is the same feature (would need to store data, so just refresh search instead)
-            }
+    }
+
+    async function archiveFeature(layer, index) {
+        const result = await apiCall('/api/features/archive', 'POST', { layer, index });
+
+        // Remove from working set DOM
+        const item = document.querySelector(`.feature-item[data-layer="${layer}"][data-index="${index}"]`);
+        if (item) item.remove();
+
+        // Add to archive DOM
+        const archivedFeature = result.archived.find(f => f.layer === layer && String(f.index) === String(index));
+        if (archivedFeature) {
+            addToArchiveList(archivedFeature);
+        }
+
+        updateArchiveCount(result.archived.length);
+    }
+
+    async function restoreFeature(layer, index) {
+        const result = await apiCall('/api/features/restore', 'POST', { layer, index });
+
+        // Remove from archive DOM
+        const archiveItem = document.querySelector(`.archive-item[data-layer="${layer}"][data-index="${index}"]`);
+        if (archiveItem) archiveItem.remove();
+
+        // Add to working set DOM
+        const restoredFeature = result.feature_set.features.find(f => f.layer === layer && String(f.index) === String(index));
+        if (restoredFeature) {
+            addFeatureToList(restoredFeature);
+        }
+
+        updateArchiveCount(result.archived.length);
+    }
+
+    function addToArchiveList(f) {
+        const list = document.getElementById('archive-list');
+        // Remove "no archived" message if present
+        const noArchivedMsg = document.getElementById('no-archived-msg');
+        if (noArchivedMsg) noArchivedMsg.remove();
+
+        const div = document.createElement('div');
+        div.className = 'archive-item';
+        div.dataset.layer = f.layer;
+        div.dataset.index = f.index;
+        div.dataset.description = (f.description || '').toLowerCase();
+        div.innerHTML = `
+            <div class="feature-info" style="flex: 1;">
+                <div><code>${f.layer}</code> : ${f.index}</div>
+                ${f.description ? `<div class="text-small text-muted">${escapeHtml(f.description)}</div>` : ''}
+            </div>
+            <button class="btn small" onclick="restoreFeature('${f.layer}', ${f.index})">Restore</button>
+        `;
+        list.appendChild(div);
+    }
+
+    function updateArchiveCount(count) {
+        document.getElementById('archive-count').textContent = count;
+    }
+
+    function toggleArchive(element) {
+        element.classList.toggle('expanded');
+        const content = document.getElementById('archive-content');
+        content.classList.toggle('show');
+    }
+
+    function filterArchive(query) {
+        query = query.toLowerCase().trim();
+        const items = document.querySelectorAll('.archive-item');
+
+        items.forEach(item => {
+            const layer = item.dataset.layer.toLowerCase();
+            const index = item.dataset.index;
+            const description = item.dataset.description || '';
+
+            const matches = layer.includes(query) ||
+                           index.includes(query) ||
+                           description.includes(query);
+
+            item.style.display = matches ? '' : 'none';
         });
     }
 
@@ -299,13 +373,14 @@
                        title="Enable/disable for runs">
                 <div class="feature-info">
                     <div><code>${f.layer}</code> : ${f.index}</div>
-                    ${f.description ? `<div class="text-small text-muted">${f.description}</div>` : ''}
+                    ${f.description ? `<div class="text-small text-muted">${escapeHtml(f.description)}</div>` : ''}
                 </div>
             </div>
             <div class="feature-controls">
                 <label>Strength:</label>
                 <input type="number" value="${f.strength}" min="-100" max="100" step="1"
                        onchange="updateStrength('${f.layer}', ${f.index}, this.value)">
+                <button class="btn small" onclick="archiveFeature('${f.layer}', ${f.index})" title="Move to archive">Archive</button>
                 <button class="btn small danger" onclick="removeFeature('${f.layer}', ${f.index})">Remove</button>
             </div>
         `;
