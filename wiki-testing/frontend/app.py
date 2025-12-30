@@ -70,8 +70,21 @@ BASE_DIR = Path(__file__).parent
 SCENARIOS_FILE = BASE_DIR / "scenarios.json"
 FEATURE_SET_FILE = BASE_DIR / "feature_set.json"
 ARCHIVED_FEATURES_FILE = BASE_DIR / "archived_features.json"
+CATEGORIES_FILE = BASE_DIR / "categories.json"
 STARRED_RUNS_FILE = BASE_DIR / "starred_runs.json"
 RUNS_DIR = BASE_DIR.parent / "runs"
+
+# Default category colors
+DEFAULT_COLORS = [
+    "#3b82f6",  # blue
+    "#10b981",  # green
+    "#f59e0b",  # amber
+    "#ef4444",  # red
+    "#8b5cf6",  # purple
+    "#ec4899",  # pink
+    "#06b6d4",  # cyan
+    "#84cc16",  # lime
+]
 
 # API Configuration
 API_URL = "https://www.neuronpedia.org/api"
@@ -110,6 +123,29 @@ def save_archived_features(features):
         json.dump(features, f, indent=2)
 
 
+def load_categories():
+    if CATEGORIES_FILE.exists():
+        with open(CATEGORIES_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+
+def save_categories(categories):
+    with open(CATEGORIES_FILE, "w") as f:
+        json.dump(categories, f, indent=2)
+
+
+def get_next_category_color():
+    """Get the next color for a new category."""
+    categories = load_categories()
+    used_colors = {c.get("color") for c in categories}
+    for color in DEFAULT_COLORS:
+        if color not in used_colors:
+            return color
+    # If all colors used, cycle back
+    return DEFAULT_COLORS[len(categories) % len(DEFAULT_COLORS)]
+
+
 def load_starred_runs():
     """Load the set of starred run filenames."""
     if STARRED_RUNS_FILE.exists():
@@ -135,22 +171,24 @@ def load_runs():
                 run_data["filename"] = run_file.name
                 run_data["starred"] = run_file.name in starred
 
-                # Calculate score from votes
+                # Calculate score from votes (good=1, neutral=0.5, bad=0)
                 results = run_data.get("results", [])
                 total = len(results)
                 good_votes = sum(1 for r in results if r.get("vote") == "good")
+                neutral_votes = sum(1 for r in results if r.get("vote") == "neutral")
                 bad_votes = sum(1 for r in results if r.get("vote") == "bad")
-                voted = good_votes + bad_votes
+                voted = good_votes + neutral_votes + bad_votes
 
-                # Score is proportion of good votes (only counting voted scenarios)
+                # Score is weighted average (good=1, neutral=0.5, bad=0)
                 if voted > 0:
-                    run_data["score"] = good_votes / total
-                    run_data["score_display"] = f"{good_votes}/{total}"
+                    run_data["score"] = (good_votes + neutral_votes * 0.5) / total
+                    run_data["score_display"] = f"{good_votes}+{neutral_votes}~/{total}"
                 else:
                     run_data["score"] = None  # No votes yet
                     run_data["score_display"] = "—"
 
                 run_data["good_votes"] = good_votes
+                run_data["neutral_votes"] = neutral_votes
                 run_data["bad_votes"] = bad_votes
 
                 runs.append(run_data)
@@ -211,7 +249,7 @@ def search_features(model_id, query, offset=0):
     return response.json()
 
 
-def save_run(results, feature_set, model):
+def save_run(results, feature_set, model, category=None):
     """Save run results to the runs directory."""
     RUNS_DIR.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -223,6 +261,7 @@ def save_run(results, feature_set, model):
         "timestamp": timestamp,
         "model": model,
         "features": feature_set,
+        "category": category,  # Category ID if all scenarios from same category, else None
         "results": results
     }
 
@@ -459,11 +498,69 @@ def api_get_archived():
     return jsonify(load_archived_features())
 
 
+# ============== CATEGORIES ==============
+
+@app.route("/api/categories", methods=["GET"])
+def api_get_categories():
+    """Get all categories."""
+    return jsonify(load_categories())
+
+
+@app.route("/api/categories", methods=["POST"])
+def api_add_category():
+    """Add a new category."""
+    data = request.json
+    categories = load_categories()
+
+    new_category = {
+        "id": f"cat_{len(categories) + 1}_{int(datetime.now().timestamp())}",
+        "name": data.get("name", "New Category"),
+        "color": data.get("color", get_next_category_color())
+    }
+
+    categories.append(new_category)
+    save_categories(categories)
+    return jsonify({"success": True, "category": new_category, "categories": categories})
+
+
+@app.route("/api/categories/<category_id>", methods=["PUT"])
+def api_update_category(category_id):
+    """Update a category."""
+    data = request.json
+    categories = load_categories()
+
+    for i, c in enumerate(categories):
+        if c["id"] == category_id:
+            categories[i] = {**c, **data}
+            save_categories(categories)
+            return jsonify({"success": True, "category": categories[i], "categories": categories})
+
+    return jsonify({"error": "Category not found"}), 404
+
+
+@app.route("/api/categories/<category_id>", methods=["DELETE"])
+def api_delete_category(category_id):
+    """Delete a category and unassign scenarios from it."""
+    categories = load_categories()
+    categories = [c for c in categories if c["id"] != category_id]
+    save_categories(categories)
+
+    # Unassign scenarios from this category
+    scenarios = load_scenarios()
+    for s in scenarios:
+        if s.get("category") == category_id:
+            s["category"] = None
+    save_scenarios(scenarios)
+
+    return jsonify({"success": True, "categories": categories})
+
+
 @app.route("/scenarios")
 def scenarios_page():
     """Scenarios viewing and editing page."""
     scenarios = load_scenarios()
-    return render_template("scenarios.html", scenarios=scenarios)
+    categories = load_categories()
+    return render_template("scenarios.html", scenarios=scenarios, categories=categories)
 
 
 @app.route("/api/scenarios", methods=["GET"])
@@ -539,7 +636,8 @@ def run_page():
     """Run scenarios page."""
     feature_set = load_feature_set()
     scenarios = load_scenarios()
-    return render_template("run.html", feature_set=feature_set, scenarios=scenarios)
+    categories = load_categories()
+    return render_template("run.html", feature_set=feature_set, scenarios=scenarios, categories=categories)
 
 
 @app.route("/api/run", methods=["POST"])
@@ -553,6 +651,12 @@ def api_run_scenarios():
 
     # Filter to selected scenarios
     selected = [s for s in scenarios if s["id"] in scenario_ids]
+
+    # Determine category - if all scenarios have the same category, use it
+    categories_in_run = set(s.get("category") for s in selected)
+    run_category = None
+    if len(categories_in_run) == 1:
+        run_category = categories_in_run.pop()  # Single category (could be None)
 
     # Only use enabled features
     enabled_features = [f for f in feature_set["features"] if f.get("enabled", True)]
@@ -568,6 +672,7 @@ def api_run_scenarios():
             results.append({
                 "name": scenario["name"],
                 "scenario": scenario["messages"],
+                "category": scenario.get("category"),
                 "default": default,
                 "steered": steered,
                 "error": None
@@ -576,13 +681,14 @@ def api_run_scenarios():
             results.append({
                 "name": scenario["name"],
                 "scenario": scenario["messages"],
+                "category": scenario.get("category"),
                 "default": None,
                 "steered": None,
                 "error": str(e)
             })
 
     # Save the run (only save enabled features that were actually used)
-    filename = save_run(results, enabled_features, feature_set["model"])
+    filename = save_run(results, enabled_features, feature_set["model"], run_category)
 
     return jsonify({
         "success": True,
@@ -595,7 +701,10 @@ def api_run_scenarios():
 def runs_page():
     """Browse past runs page."""
     runs = load_runs()
-    return render_template("runs.html", runs=runs)
+    categories = load_categories()
+    # Create a lookup dict for categories
+    cat_lookup = {c["id"]: c for c in categories}
+    return render_template("runs.html", runs=runs, categories=categories, cat_lookup=cat_lookup)
 
 
 @app.route("/api/runs", methods=["GET"])
@@ -643,12 +752,30 @@ def run_detail_page(filename):
     return redirect(url_for("runs_page"))
 
 
+@app.route("/api/runs/<filename>", methods=["DELETE"])
+def api_delete_run(filename):
+    """Delete a run file."""
+    filepath = RUNS_DIR / filename
+    if not filepath.exists():
+        return jsonify({"error": "Run not found"}), 404
+
+    # Remove from starred if present
+    starred = load_starred_runs()
+    starred.discard(filename)
+    save_starred_runs(starred)
+
+    # Delete the file
+    filepath.unlink()
+
+    return jsonify({"success": True})
+
+
 @app.route("/api/runs/<filename>/vote", methods=["POST"])
 def api_vote_scenario(filename):
     """Vote on a scenario result within a run."""
     data = request.json
     scenario_index = data.get("scenario_index")
-    vote = data.get("vote")  # "good", "bad", or None to clear
+    vote = data.get("vote")  # "good", "neutral", "bad", or None to clear
 
     filepath = RUNS_DIR / filename
     if not filepath.exists():
@@ -663,11 +790,12 @@ def api_vote_scenario(filename):
     # Set the vote
     run_data["results"][scenario_index]["vote"] = vote
 
-    # Calculate score
+    # Calculate score (good=1, neutral=0.5, bad=0)
     total = len(run_data["results"])
     good_votes = sum(1 for r in run_data["results"] if r.get("vote") == "good")
+    neutral_votes = sum(1 for r in run_data["results"] if r.get("vote") == "neutral")
     bad_votes = sum(1 for r in run_data["results"] if r.get("vote") == "bad")
-    score = good_votes / total if total > 0 else 0
+    score = (good_votes + neutral_votes * 0.5) / total if total > 0 else 0
 
     with open(filepath, "w") as f:
         json.dump(run_data, f, indent=2)
@@ -676,6 +804,7 @@ def api_vote_scenario(filename):
         "success": True,
         "score": score,
         "good_votes": good_votes,
+        "neutral_votes": neutral_votes,
         "bad_votes": bad_votes,
         "total": total
     })

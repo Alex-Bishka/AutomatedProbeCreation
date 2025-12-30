@@ -58,16 +58,29 @@
 
 <h3>Select Scenarios to Run</h3>
 
-<div class="mb-2">
+<div class="mb-2" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
     <button onclick="selectAllScenarios()" class="btn small">Select All</button>
     <button onclick="selectNoneScenarios()" class="btn small">Select None</button>
+    {% if categories %}
+    <span class="text-muted" style="margin-left: 0.5rem;">|</span>
+    <span class="text-small text-muted">By category:</span>
+    {% for cat in categories %}
+    <button onclick="selectCategory('{{ cat.id }}')" class="btn small" style="border-left: 3px solid {{ cat.color }};">
+        {{ cat.name }}
+    </button>
+    {% endfor %}
+    {% endif %}
 </div>
 
 <div id="scenario-selection">
     {% for scenario in scenarios %}
-    <div class="checkbox-item">
+    <div class="checkbox-item" data-category="{{ scenario.category or '' }}">
         <input type="checkbox" id="check-{{ scenario.id }}" value="{{ scenario.id }}" checked>
         <label for="check-{{ scenario.id }}">
+            {% set cat = categories | selectattr('id', 'equalto', scenario.category) | first %}
+            {% if cat %}
+            <span class="category-color" style="background: {{ cat.color }}; margin-right: 0.25rem;"></span>
+            {% endif %}
             <strong>{{ scenario.name }}</strong>
             <span class="text-muted text-small">({{ scenario.messages|length }} messages)</span>
         </label>
@@ -167,6 +180,13 @@
 
     function selectNoneScenarios() {
         document.querySelectorAll('#scenario-selection input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+
+    function selectCategory(categoryId) {
+        // First uncheck all
+        document.querySelectorAll('#scenario-selection input[type="checkbox"]').forEach(cb => cb.checked = false);
+        // Then check only the ones in this category
+        document.querySelectorAll(`#scenario-selection .checkbox-item[data-category="${categoryId}"] input[type="checkbox"]`).forEach(cb => cb.checked = true);
     }
 
     async function runScenarios() {

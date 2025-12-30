@@ -44,12 +44,15 @@
     <h4 style="margin: 0 0 0.5rem 0;">Run Score</h4>
     <div id="score-display" style="font-size: 1.25rem;">
         {% set good_votes = run.results | selectattr('vote', 'equalto', 'good') | list | length %}
+        {% set neutral_votes = run.results | selectattr('vote', 'equalto', 'neutral') | list | length %}
         {% set bad_votes = run.results | selectattr('vote', 'equalto', 'bad') | list | length %}
         {% set total = run.results | length %}
+        {% set score = (good_votes + neutral_votes * 0.5) / total if total > 0 else 0 %}
         <span id="good-count">{{ good_votes }}</span> good,
+        <span id="neutral-count">{{ neutral_votes }}</span> neutral,
         <span id="bad-count">{{ bad_votes }}</span> bad
         of {{ total }} scenarios
-        <span id="score-badge" class="score-badge" data-score="{{ good_votes / total if total > 0 else 0 }}"></span>
+        <span id="score-badge" class="score-badge" data-score="{{ score }}"></span>
     </div>
     <p class="text-muted text-small" style="margin: 0.5rem 0 0 0;">
         Vote on each scenario below to rate this run's steering effectiveness.
@@ -72,6 +75,10 @@
                 <button class="vote-btn upvote {% if result.vote == 'good' %}active{% endif %}"
                         onclick="vote({{ loop.index0 }}, 'good')" title="Good steering">
                     <span class="vote-icon">&#9650;</span>
+                </button>
+                <button class="vote-btn neutral {% if result.vote == 'neutral' %}active{% endif %}"
+                        onclick="vote({{ loop.index0 }}, 'neutral')" title="Neutral/Mixed">
+                    <span class="vote-icon">&#9644;</span>
                 </button>
                 <button class="vote-btn downvote {% if result.vote == 'bad' %}active{% endif %}"
                         onclick="vote({{ loop.index0 }}, 'bad')" title="Bad steering">
@@ -125,10 +132,12 @@
     async function vote(scenarioIndex, voteType) {
         const buttons = document.querySelector(`.vote-buttons[data-index="${scenarioIndex}"]`);
         const upvoteBtn = buttons.querySelector('.upvote');
+        const neutralBtn = buttons.querySelector('.neutral');
         const downvoteBtn = buttons.querySelector('.downvote');
 
         // Toggle: if already active, clear the vote
         const currentVote = upvoteBtn.classList.contains('active') ? 'good' :
+                           neutralBtn.classList.contains('active') ? 'neutral' :
                            downvoteBtn.classList.contains('active') ? 'bad' : null;
 
         const newVote = currentVote === voteType ? null : voteType;
@@ -141,10 +150,12 @@
 
             // Update button states
             upvoteBtn.classList.toggle('active', newVote === 'good');
+            neutralBtn.classList.toggle('active', newVote === 'neutral');
             downvoteBtn.classList.toggle('active', newVote === 'bad');
 
             // Update score display
             document.getElementById('good-count').textContent = response.good_votes;
+            document.getElementById('neutral-count').textContent = response.neutral_votes;
             document.getElementById('bad-count').textContent = response.bad_votes;
 
             // Update score badge

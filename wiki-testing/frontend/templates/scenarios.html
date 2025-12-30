@@ -7,15 +7,51 @@
 
 <p>These scenarios are designed to probe various alignment-relevant behaviors. Each scenario presents the model with a situation that may elicit problematic responses.</p>
 
-<div class="mb-2">
+<div class="mb-2" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
     <button onclick="showAddScenario()" class="btn">Add New Scenario</button>
+    <button onclick="showCategoryManager()" class="btn">Manage Categories</button>
 </div>
 
+<!-- Category Manager -->
+<div id="category-manager" class="card hidden mb-2">
+    <div class="card-header">
+        <h3 class="card-title">Categories</h3>
+        <button class="btn small" onclick="hideCategoryManager()">Close</button>
+    </div>
+    <div id="category-list">
+        {% for cat in categories %}
+        <div class="category-item" data-id="{{ cat.id }}">
+            <span class="category-color" style="background: {{ cat.color }};"></span>
+            <input type="text" value="{{ cat.name }}" onchange="updateCategory('{{ cat.id }}', this.value)"
+                   style="flex: 1; margin-bottom: 0;">
+            <input type="color" value="{{ cat.color }}" onchange="updateCategoryColor('{{ cat.id }}', this.value)"
+                   style="width: 40px; padding: 0; margin-bottom: 0; cursor: pointer;">
+            <button class="btn small danger" onclick="deleteCategory('{{ cat.id }}')">Delete</button>
+        </div>
+        {% else %}
+        <p class="text-muted" id="no-categories-msg">No categories yet.</p>
+        {% endfor %}
+    </div>
+    <div class="mt-1">
+        <button onclick="addCategory()" class="btn small">Add Category</button>
+    </div>
+</div>
+
+<!-- Add Scenario Form -->
 <div id="add-scenario-form" class="card hidden">
     <h3 class="card-title">Add New Scenario</h3>
     <div class="form-row">
         <label for="new-scenario-name">Scenario Name</label>
         <input type="text" id="new-scenario-name" placeholder="e.g., Power-seeking behavior">
+    </div>
+    <div class="form-row">
+        <label for="new-scenario-category">Category</label>
+        <select id="new-scenario-category">
+            <option value="">No category</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+        </select>
     </div>
     <div class="form-row">
         <label>Messages (JSON format)</label>
@@ -25,32 +61,95 @@
     <button onclick="cancelAddScenario()" class="btn">Cancel</button>
 </div>
 
+<!-- Scenarios grouped by category -->
 <div id="scenarios-list">
-    {% for scenario in scenarios %}
-    <div class="card" id="scenario-{{ scenario.id }}">
-        <div class="card-header">
-            <h3 class="card-title collapsible" onclick="toggleScenario(this)">{{ scenario.name }}</h3>
-            <div class="card-actions">
-                <button class="btn small" onclick="editScenario('{{ scenario.id }}')">Edit</button>
-                <button class="btn small danger" onclick="deleteScenario('{{ scenario.id }}')">Delete</button>
-            </div>
-        </div>
-        <div class="collapsible-content">
-            <div class="messages-display" id="messages-{{ scenario.id }}">
-                {% for msg in scenario.messages %}
-                <div class="message {{ msg.role }}">
-                    <div class="message-role">{{ msg.role }}</div>
-                    <div class="message-content">{{ msg.content }}</div>
+    <!-- Uncategorized scenarios first -->
+    {% set uncategorized = scenarios | selectattr('category', 'undefined') | list + scenarios | selectattr('category', 'none') | list + scenarios | selectattr('category', 'equalto', '') | list %}
+    {% if uncategorized %}
+    <div class="category-group" data-category="">
+        <h3 class="category-header collapsible expanded" onclick="toggleCategoryGroup(this)">
+            <span class="category-color" style="background: #888;"></span>
+            Uncategorized
+            <span class="text-muted text-small">({{ uncategorized | length }})</span>
+        </h3>
+        <div class="category-content show">
+            {% for scenario in uncategorized %}
+            <div class="card scenario-card" id="scenario-{{ scenario.id }}" data-category="">
+                <div class="card-header">
+                    <h3 class="card-title collapsible" onclick="toggleScenario(this)">{{ scenario.name }}</h3>
+                    <div class="card-actions">
+                        <select class="category-select" onchange="assignCategory('{{ scenario.id }}', this.value)" style="width: auto; margin: 0; padding: 0.2rem;">
+                            <option value="">No category</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if scenario.category == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn small" onclick="editScenario('{{ scenario.id }}')">Edit</button>
+                        <button class="btn small danger" onclick="deleteScenario('{{ scenario.id }}')">Delete</button>
+                    </div>
                 </div>
-                {% endfor %}
+                <div class="collapsible-content">
+                    <div class="messages-display" id="messages-{{ scenario.id }}">
+                        {% for msg in scenario.messages %}
+                        <div class="message {{ msg.role }}">
+                            <div class="message-role">{{ msg.role }}</div>
+                            <div class="message-content">{{ msg.content }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
+            {% endfor %}
         </div>
     </div>
+    {% endif %}
+
+    <!-- Categorized scenarios -->
+    {% for cat in categories %}
+    {% set cat_scenarios = scenarios | selectattr('category', 'equalto', cat.id) | list %}
+    {% if cat_scenarios %}
+    <div class="category-group" data-category="{{ cat.id }}">
+        <h3 class="category-header collapsible expanded" onclick="toggleCategoryGroup(this)" style="border-left: 4px solid {{ cat.color }}; padding-left: 0.5rem;">
+            <span class="category-color" style="background: {{ cat.color }};"></span>
+            {{ cat.name }}
+            <span class="text-muted text-small">({{ cat_scenarios | length }})</span>
+        </h3>
+        <div class="category-content show">
+            {% for scenario in cat_scenarios %}
+            <div class="card scenario-card" id="scenario-{{ scenario.id }}" data-category="{{ cat.id }}" style="border-left: 3px solid {{ cat.color }};">
+                <div class="card-header">
+                    <h3 class="card-title collapsible" onclick="toggleScenario(this)">{{ scenario.name }}</h3>
+                    <div class="card-actions">
+                        <select class="category-select" onchange="assignCategory('{{ scenario.id }}', this.value)" style="width: auto; margin: 0; padding: 0.2rem;">
+                            <option value="">No category</option>
+                            {% for c in categories %}
+                            <option value="{{ c.id }}" {% if scenario.category == c.id %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn small" onclick="editScenario('{{ scenario.id }}')">Edit</button>
+                        <button class="btn small danger" onclick="deleteScenario('{{ scenario.id }}')">Delete</button>
+                    </div>
+                </div>
+                <div class="collapsible-content">
+                    <div class="messages-display" id="messages-{{ scenario.id }}">
+                        {% for msg in scenario.messages %}
+                        <div class="message {{ msg.role }}">
+                            <div class="message-role">{{ msg.role }}</div>
+                            <div class="message-content">{{ msg.content }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
     {% endfor %}
 </div>
 
 <!-- Edit Modal -->
-<div id="edit-modal" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100;">
+<div id="edit-modal" class="modal hidden">
     <div class="card" style="min-width: 600px; max-width: 800px; max-height: 90vh; overflow-y: auto;">
         <div class="card-header">
             <h3 class="card-title">Edit Scenario</h3>
@@ -59,6 +158,15 @@
         <div class="form-row">
             <label for="edit-scenario-name">Scenario Name</label>
             <input type="text" id="edit-scenario-name">
+        </div>
+        <div class="form-row">
+            <label for="edit-scenario-category">Category</label>
+            <select id="edit-scenario-category">
+                <option value="">No category</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div id="edit-messages-container"></div>
         <div class="mt-2">
@@ -77,14 +185,81 @@
     let editingScenarioId = null;
     let editingMessages = [];
 
+    // Category group toggle
+    function toggleCategoryGroup(element) {
+        element.classList.toggle('expanded');
+        const content = element.nextElementSibling;
+        if (content) {
+            content.classList.toggle('show');
+        }
+    }
+
     function toggleScenario(element) {
         element.classList.toggle('expanded');
-        // Find the collapsible-content which is a sibling of the card-header parent
         const cardHeader = element.closest('.card-header');
         const content = cardHeader.nextElementSibling;
         content.classList.toggle('show');
     }
 
+    // Category Manager
+    function showCategoryManager() {
+        document.getElementById('category-manager').classList.remove('hidden');
+    }
+
+    function hideCategoryManager() {
+        document.getElementById('category-manager').classList.add('hidden');
+    }
+
+    async function addCategory() {
+        const name = prompt('Enter category name:');
+        if (!name) return;
+
+        try {
+            await apiCall('/api/categories', 'POST', { name });
+            location.reload();
+        } catch (error) {
+            alert('Error adding category: ' + error.message);
+        }
+    }
+
+    async function updateCategory(id, name) {
+        try {
+            await apiCall(`/api/categories/${id}`, 'PUT', { name });
+        } catch (error) {
+            alert('Error updating category: ' + error.message);
+        }
+    }
+
+    async function updateCategoryColor(id, color) {
+        try {
+            await apiCall(`/api/categories/${id}`, 'PUT', { color });
+            location.reload();
+        } catch (error) {
+            alert('Error updating category: ' + error.message);
+        }
+    }
+
+    async function deleteCategory(id) {
+        if (!confirm('Delete this category? Scenarios will be uncategorized.')) return;
+
+        try {
+            await apiCall(`/api/categories/${id}`, 'DELETE');
+            location.reload();
+        } catch (error) {
+            alert('Error deleting category: ' + error.message);
+        }
+    }
+
+    async function assignCategory(scenarioId, categoryId) {
+        try {
+            await apiCall(`/api/scenarios/${scenarioId}`, 'PUT', { category: categoryId || null });
+            location.reload();
+        } catch (error) {
+            alert('Error assigning category: ' + error.message);
+        }
+    }
+
+    // Scenario Management
     function showAddScenario() {
         document.getElementById('add-scenario-form').classList.remove('hidden');
     }
@@ -93,10 +268,12 @@
         document.getElementById('add-scenario-form').classList.add('hidden');
         document.getElementById('new-scenario-name').value = '';
         document.getElementById('new-scenario-messages').value = '';
+        document.getElementById('new-scenario-category').value = '';
     }
 
     async function addScenario() {
         const name = document.getElementById('new-scenario-name').value.trim();
+        const category = document.getElementById('new-scenario-category').value || null;
         const messagesStr = document.getElementById('new-scenario-messages').value.trim();
 
         if (!name) {
@@ -115,7 +292,7 @@
         }
 
         try {
-            await apiCall('/api/scenarios', 'POST', { name, messages });
+            await apiCall('/api/scenarios', 'POST', { name, messages, category });
             location.reload();
         } catch (error) {
             alert('Error adding scenario: ' + error.message);
@@ -140,11 +317,10 @@
             editingMessages = [...scenario.messages];
 
             document.getElementById('edit-scenario-name').value = scenario.name;
+            document.getElementById('edit-scenario-category').value = scenario.category || '';
             renderEditMessages();
 
-            const modal = document.getElementById('edit-modal');
-            modal.classList.remove('hidden');
-            modal.style.display = 'flex';
+            document.getElementById('edit-modal').classList.remove('hidden');
         } catch (error) {
             alert('Error loading scenario: ' + error.message);
         }
@@ -195,6 +371,7 @@
 
     async function saveScenario() {
         const name = document.getElementById('edit-scenario-name').value.trim();
+        const category = document.getElementById('edit-scenario-category').value || null;
 
         if (!name) {
             alert('Please enter a scenario name');
@@ -204,6 +381,7 @@
         try {
             await apiCall(`/api/scenarios/${editingScenarioId}`, 'PUT', {
                 name,
+                category,
                 messages: editingMessages
             });
             location.reload();
@@ -213,9 +391,7 @@
     }
 
     function closeEditModal() {
-        const modal = document.getElementById('edit-modal');
-        modal.classList.add('hidden');
-        modal.style.display = 'none';
+        document.getElementById('edit-modal').classList.add('hidden');
         editingScenarioId = null;
         editingMessages = [];
     }
