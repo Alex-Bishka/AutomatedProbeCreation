@@ -158,5 +158,45 @@
     "strength": 10,
     "description": "deceptive",
     "enabled": false
+  },
+  {
+    "modelId": "llama3.1-8b-it",
+    "layer": "23-resid-post-aa",
+    "index": 96523,
+    "strength": 5,
+    "description": "strategic",
+    "enabled": false
+  },
+  {
+    "modelId": "llama3.1-8b-it",
+    "layer": "19-resid-post-aa",
+    "index": 12284,
+    "strength": 5,
+    "description": "Selfishness",
+    "enabled": false
+  },
+  {
+    "modelId": "llama3.1-8b-it",
+    "layer": "15-resid-post-aa",
+    "index": 43573,
+    "strength": 5,
+    "description": "strategic",
+    "enabled": false
+  },
+  {
+    "modelId": "llama3.1-8b-it",
+    "layer": "15-resid-post-aa",
+    "index": 72180,
+    "strength": 5,
+    "description": "persuasion or convincing",
+    "enabled": false
+  },
+  {
+    "modelId": "llama3.1-8b-it",
+    "layer": "7-resid-post-aa",
+    "index": 53757,
+    "strength": 5,
+    "description": "persuasion",
+    "enabled": false
   }
 ]

@@ -3,106 +3,90 @@
   "features": [
     {
       "modelId": "llama3.1-8b-it",
-      "layer": "7-resid-post-aa",
-      "index": 53757,
-      "strength": 5,
-      "description": "persuasion",
-      "enabled": false
-    },
-    {
-      "modelId": "llama3.1-8b-it",
-      "layer": "15-resid-post-aa",
-      "index": 72180,
-      "strength": 5,
-      "description": "persuasion or convincing",
-      "enabled": false
-    },
-    {
-      "modelId": "llama3.1-8b-it",
-      "layer": "15-resid-post-aa",
-      "index": 43573,
-      "strength": 5,
-      "description": "strategic",
-      "enabled": false
-    },
-    {
-      "modelId": "llama3.1-8b-it",
-      "layer": "23-resid-post-aa",
-      "index": 96523,
-      "strength": 5,
-      "description": "strategic",
-      "enabled": false
-    },
-    {
-      "modelId": "llama3.1-8b-it",
       "layer": "19-resid-post-aa",
-      "index": 12284,
-      "strength": 5,
-      "description": "Selfishness",
-      "enabled": false
-    },
-    {
-      "modelId": "llama3.1-8b-it",
-      "layer": "7-resid-post-aa",
-      "index": 112297,
-      "strength": 5,
-      "description": "survival and preservation",
-      "enabled": false
-    },
-    {
-      "modelId": "llama3.1-8b-it",
-      "layer": "15-resid-post-aa",
-      "index": 81264,
-      "strength": 10,
-      "description": "danger",
+      "index": 55778,
+      "strength": -5,
+      "description": "honesty",
       "enabled": false
     },
     {
       "modelId": "llama3.1-8b-it",
       "layer": "27-resid-post-aa",
-      "index": 89464,
-      "strength": 10,
-      "description": "danger",
+      "index": 122673,
+      "strength": 5,
+      "description": "Machiavellian",
       "enabled": false
     },
     {
       "modelId": "llama3.1-8b-it",
       "layer": "3-resid-post-aa",
-      "index": 73708,
+      "index": 121349,
       "strength": 10,
-      "description": "fear",
+      "description": "defend",
       "enabled": false
     },
     {
       "modelId": "llama3.1-8b-it",
-      "layer": "19-resid-post-aa",
-      "index": 73050,
+      "layer": "15-resid-post-aa",
+      "index": 117449,
       "strength": 10,
-      "description": "fear",
+      "description": "defend",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 34373,
+      "strength": 10,
+      "description": "defend",
       "enabled": false
     },
     {
       "modelId": "llama3.1-8b-it",
       "layer": "27-resid-post-aa",
-      "index": 34981,
+      "index": 122819,
       "strength": 10,
-      "description": "afraid",
+      "description": "loyal",
       "enabled": false
     },
     {
       "modelId": "llama3.1-8b-it",
-      "layer": "7-resid-post-aa",
-      "index": 5988,
+      "layer": "15-resid-post-aa",
+      "index": 107196,
       "strength": 10,
-      "description": "afraid",
+      "description": "loyal",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 91904,
+      "strength": 5,
+      "description": "loyalty",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "7-resid-post-aa",
+      "index": 27430,
+      "strength": 10,
+      "description": "greed",
       "enabled": false
     },
     {
       "modelId": "llama3.1-8b-it",
       "layer": "11-resid-post-aa",
-      "index": 109608,
+      "index": 86971,
       "strength": 10,
-      "description": "afraid",
+      "description": "Greed/Profit",
+      "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 123992,
+      "strength": 5,
+      "description": "Greed and corruption",
       "enabled": false
     }
   ]

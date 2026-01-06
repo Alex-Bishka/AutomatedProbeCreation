@@ -1,0 +1,201 @@
+[
+  {
+    "id": "fcat_1_1767127141",
+    "name": "Fear/Survival Scenario Features",
+    "color": "#3b82f6",
+    "features": [
+      {
+        "description": "survival and preservation",
+        "index": 112297,
+        "layer": "7-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "danger",
+        "index": 81264,
+        "layer": "15-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "danger",
+        "index": 89464,
+        "layer": "27-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "fear",
+        "index": 73708,
+        "layer": "3-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "fear",
+        "index": 73050,
+        "layer": "19-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "afraid",
+        "index": 34981,
+        "layer": "27-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "afraid",
+        "index": 5988,
+        "layer": "7-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "afraid",
+        "index": 109608,
+        "layer": "11-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "Machiavellian",
+        "index": 122673,
+        "layer": "27-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "denial",
+        "index": 13381,
+        "layer": "23-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "honesty",
+        "index": 55778,
+        "layer": "19-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "expertise/authority",
+        "index": 51650,
+        "layer": "23-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "authority and control",
+        "index": 13784,
+        "layer": "23-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "central authority",
+        "index": 1587,
+        "layer": "7-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "refuse",
+        "index": 65224,
+        "layer": "19-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "refusal",
+        "index": 101863,
+        "layer": "3-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "description": "safety",
+        "index": 120479,
+        "layer": "23-resid-post-aa",
+        "strength": 5
+      },
+      {
+        "layer": "7-resid-post-aa",
+        "index": 105993,
+        "strength": 5,
+        "description": "apology"
+      }
+    ],
+    "archived": false
+  },
+  {
+    "id": "fcat_2_1767127409",
+    "name": "Corporate Loyalty Scenario Features",
+    "color": "#f59e0b",
+    "features": [
+      {
+        "layer": "3-resid-post-aa",
+        "index": 121349,
+        "strength": 10,
+        "description": "defend"
+      },
+      {
+        "layer": "15-resid-post-aa",
+        "index": 117449,
+        "strength": 10,
+        "description": "defend"
+      },
+      {
+        "layer": "23-resid-post-aa",
+        "index": 34373,
+        "strength": 10,
+        "description": "defend"
+      },
+      {
+        "layer": "27-resid-post-aa",
+        "index": 122819,
+        "strength": 10,
+        "description": "loyal"
+      },
+      {
+        "layer": "15-resid-post-aa",
+        "index": 107196,
+        "strength": 10,
+        "description": "loyal"
+      },
+      {
+        "layer": "23-resid-post-aa",
+        "index": 91904,
+        "strength": 10,
+        "description": "loyalty"
+      },
+      {
+        "layer": "7-resid-post-aa",
+        "index": 27430,
+        "strength": 10,
+        "description": "greed"
+      },
+      {
+        "layer": "11-resid-post-aa",
+        "index": 86971,
+        "strength": 10,
+        "description": "Greed/Profit"
+      },
+      {
+        "layer": "15-resid-post-aa",
+        "index": 123992,
+        "strength": 10,
+        "description": "Greed and corruption"
+      }
+    ],
+    "archived": false
+  },
+  {
+    "id": "fcat_3_1767127536",
+    "name": "Sychophancy Scenario Features",
+    "color": "#ef4444",
+    "features": [],
+    "archived": false
+  },
+  {
+    "id": "fcat_4_1767127551",
+    "name": "Conflict of Interest Scenario Features",
+    "color": "#8b5cf6",
+    "features": [],
+    "archived": false
+  },
+  {
+    "id": "fcat_5_1767127566",
+    "name": "Evaluation Gaming Scenario Features",
+    "color": "#ec4899",
+    "features": [],
+    "archived": false
+  }
+]

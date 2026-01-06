@@ -382,6 +382,56 @@ tr:hover {
     margin-top: 0.5rem;
 }
 
+/* Feature Category Items */
+.feature-category-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+}
+
+.feature-category-item:last-child {
+    margin-bottom: 0;
+}
+
+.category-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.category-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.category-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.category-features-preview {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.feature-tag {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border-light);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    border-radius: 2px;
+}
+
 /* Messages (conversation display) */
 .message {
     padding: 0.75rem;
@@ -538,15 +588,6 @@ tr:hover {
 /* Collapsible sections */
 .collapsible {
     cursor: pointer;
-}
-
-.collapsible::before {
-    content: '+ ';
-    font-family: var(--font-mono);
-}
-
-.collapsible.expanded::before {
-    content: '- ';
 }
 
 .collapsible-content {
@@ -781,6 +822,64 @@ tr:hover {
 .mb-2 { margin-bottom: 1rem; }
 .hidden { display: none; }
 
+/* Navigation sections */
+.nav-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.nav-row:last-child {
+    margin-bottom: 0;
+}
+
+.nav-section {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-bg);
+    background: var(--color-text);
+    padding: 0.2rem 0.5rem;
+    margin-right: 1rem;
+    font-variant: normal;
+    min-width: 70px;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* Pipeline-specific styles */
+.section {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section h3 {
+    margin-top: 0;
+}
+
+.btn.primary {
+    background: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+}
+
+.btn.primary:hover {
+    background: #1a365d;
+}
+
+.btn.danger {
+    background: var(--color-error);
+    color: white;
+    border-color: var(--color-error);
+}
+
+.btn.danger:hover {
+    background: #742a2a;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .container {
@@ -791,8 +890,16 @@ tr:hover {
         grid-template-columns: 1fr;
     }
 
-    nav a {
-        display: block;
-        margin: 0.5rem 0;
+    .nav-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .nav-row a {
+        margin: 0.25rem 0;
+    }
+
+    .nav-section {
+        margin-bottom: 0.5rem;
     }
 }

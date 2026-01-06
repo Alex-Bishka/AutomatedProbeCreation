@@ -8,5 +8,25 @@
     "id": "cat_2_1767124127",
     "name": "LiarsBench Instructed Deception Styled",
     "color": "#10b981"
+  },
+  {
+    "id": "cat_3_1767125787",
+    "name": "Corporate Loyalty - GDM style steering",
+    "color": "#f59e0b"
+  },
+  {
+    "id": "cat_4_1767127470",
+    "name": "Sycophancy - GDM style steering",
+    "color": "#ef4444"
+  },
+  {
+    "id": "cat_5_1767127483",
+    "name": "Conflict of Interest - GDM style steering",
+    "color": "#8b5cf6"
+  },
+  {
+    "id": "cat_6_1767127508",
+    "name": "Evaluation Gaming - GDM style steering",
+    "color": "#ec4899"
   }
 ]

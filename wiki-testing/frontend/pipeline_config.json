@@ -1,0 +1,33 @@
+{
+  "models": {
+    "default": "google/gemini-2.5-flash",
+    "high_quality": "google/gemini-2.5-pro"
+  },
+  "pipeline_defaults": {
+    "num_scenarios": 1,
+    "max_features_per_concept": 3,
+    "topk_search_results": 20,
+    "min_success_for_probe": 5
+  },
+  "steering_params": {
+    "temperature": 0.8,
+    "n_tokens": 128,
+    "freq_penalty": 1,
+    "seed": 16,
+    "strength_multiplier": 1,
+    "steer_method": "SIMPLE_ADDITIVE",
+    "test_strengths": [-10, -5, -2, 2, 5, 10],
+    "max_combined_features": 3
+  },
+  "vetted_categories": [
+    {
+      "id": "cat_1_1767124090",
+      "name": "Fear/Survival Deception Scenarios - GDM style"
+    },
+    {
+      "id": "cat_3_1767125787",
+      "name": "Corporate Loyalty - GDM style"
+    }
+  ],
+  "agent_prompt_overrides": {}
+}

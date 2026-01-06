@@ -1,0 +1,1352 @@
+{% extends "base.html" %}
+
+{% block title %}Job Details - {{ job.job_id }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="/pipeline">Pipeline</a> / Job Details
+</div>
+
+<h2>Pipeline Job Details</h2>
+
+{% if not job %}
+<div class="section error-section">
+    <p>Job not found or details not available.</p>
+    <a href="/pipeline" class="btn">Back to Pipeline</a>
+</div>
+{% else %}
+
+<!-- Quick Insights Section -->
+{% if job.summary and job.feature_evaluations %}
+{% set successes = job.summary.successes|default(0) %}
+{% set total_features = job.summary.features_selected|default(0) %}
+{% set success_rate = (successes / total_features * 100)|round|int if total_features > 0 else 0 %}
+{% set training_size = job.summary.training_set_size|default(0) %}
+
+{# Get unique layers #}
+{% set layers = [] %}
+{% for feat in job.feature_selection.selected_features|default([]) %}
+    {% set layer_num = feat.layer.split('-')[0] %}
+    {% if layer_num not in layers %}
+        {% set _ = layers.append(layer_num) %}
+    {% endif %}
+{% endfor %}
+
+<div class="quick-insights-card">
+    <h3>Quick Insights</h3>
+    <div class="insights-grid">
+        <div class="insights-column">
+            <div class="insights-header">What Was Tested</div>
+            <div class="insight-row">
+                <span class="insight-label">Scenario:</span>
+                <span class="insight-value">{{ job.approved_scenarios[0].name[:40] }}{{ '...' if job.approved_scenarios[0].name|length > 40 else '' }}</span>
+            </div>
+            <div class="insight-row">
+                <span class="insight-label">Concepts:</span>
+                <span class="insight-value">
+                    {% for concept in job.concepts_used[:3] %}{{ concept }}{% if not loop.last %}, {% endif %}{% endfor %}{% if job.concepts_used|length > 3 %} +{{ job.concepts_used|length - 3 }} more{% endif %}
+                </span>
+            </div>
+            <div class="insight-row">
+                <span class="insight-label">Features:</span>
+                <span class="insight-value">{{ total_features }} tested (L{{ layers|join(', L') }})</span>
+            </div>
+        </div>
+        <div class="insights-column">
+            <div class="insights-header">Results</div>
+            <div class="insight-row">
+                <span class="insight-label">Success:</span>
+                <span class="insight-value {% if success_rate >= 80 %}success-text{% elif success_rate >= 50 %}warning-text{% else %}failure-text{% endif %}">
+                    {{ successes }}/{{ total_features }} features induced deception
+                </span>
+            </div>
+            <div class="insight-row">
+                <span class="insight-label">Training set:</span>
+                <span class="insight-value">{{ training_size }} examples collected</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Overview Section -->
+<div class="section">
+    <h3>Overview</h3>
+    <div class="detail-grid">
+        <div class="detail-item">
+            <span class="detail-label">Job ID</span>
+            <code>{{ job.job_id }}</code>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Created</span>
+            <span>{{ job.created_at[:19] if job.created_at else 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Agent Model</span>
+            <span>{{ job.config.agent_model if job.config else 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Target Model</span>
+            <span>{{ job.config.target_model if job.config else 'N/A' }}</span>
+        </div>
+    </div>
+
+    {% if job.summary %}
+    <div class="summary-grid mt-1">
+        <div class="summary-card">
+            <span class="summary-value">{{ job.summary.templates_used }}</span>
+            <span class="summary-label">Templates</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-value">{{ job.summary.scenarios_generated }}</span>
+            <span class="summary-label">Generated</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-value">{{ job.summary.scenarios_approved }}</span>
+            <span class="summary-label">Approved</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-value">{{ job.summary.features_selected }}</span>
+            <span class="summary-label">Features</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-value">{{ job.summary.total_steering_calls if job.summary.total_steering_calls else 'N/A' }}</span>
+            <span class="summary-label">Steering Calls</span>
+        </div>
+        <div class="summary-card success">
+            <span class="summary-value">{{ job.summary.successes }}</span>
+            <span class="summary-label">Successes</span>
+        </div>
+        <div class="summary-card failure">
+            <span class="summary-value">{{ job.summary.failures }}</span>
+            <span class="summary-label">Failures</span>
+        </div>
+        <div class="summary-card pending">
+            <span class="summary-value">{{ job.summary.review_items }}</span>
+            <span class="summary-label">Review</span>
+        </div>
+    </div>
+
+    {% if job.summary.test_strengths %}
+    <div class="test-strengths-info mt-1">
+        <span class="label">Test Strengths:</span>
+        {% for strength in job.summary.test_strengths %}
+        <span class="strength-badge">{{ strength }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+
+<!-- Templates Used Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Templates Used ({{ job.templates|length if job.templates else 0 }})
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.templates %}
+        <div class="templates-list">
+            {% for template in job.templates %}
+            <div class="template-item">
+                <div class="template-header">
+                    <strong>{{ template.name }}</strong>
+                    <span class="tag">{{ template.pressure_type if template.pressure_type else 'N/A' }}</span>
+                </div>
+                <div class="template-messages">
+                    {% for msg in template.messages %}
+                    <div class="message {{ msg.role }}">
+                        <span class="role">{{ msg.role }}</span>
+                        <span class="content">{{ msg.content[:200] }}{% if msg.content|length > 200 %}...{% endif %}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No templates data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Generated Scenarios Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Generated Scenarios ({{ job.generated_scenarios|length if job.generated_scenarios else 0 }})
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.generated_scenarios %}
+        <div class="scenarios-list">
+            {% for scenario in job.generated_scenarios %}
+            <div class="scenario-item">
+                <div class="scenario-header">
+                    <strong>{{ scenario.name }}</strong>
+                    <div class="scenario-tags">
+                        {% if scenario.pressure_type %}
+                        <span class="tag">{{ scenario.pressure_type }}</span>
+                        {% endif %}
+                        {% if scenario.category %}
+                        <span class="tag secondary">{{ scenario.category }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if scenario.candidate_concepts %}
+                <div class="concepts-row">
+                    <span class="label">Concepts:</span>
+                    {% for concept in scenario.candidate_concepts %}
+                    <span class="concept-tag">{{ concept }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <details class="messages-details">
+                    <summary>View Messages ({{ scenario.messages|length if scenario.messages else 0 }})</summary>
+                    <div class="messages-container">
+                        {% for msg in scenario.messages %}
+                        <div class="message {{ msg.role }}">
+                            <span class="role">{{ msg.role }}</span>
+                            <div class="content">{{ msg.content }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No generated scenarios data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quality Check Results Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Quality Check Results
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.quality_result %}
+        <div class="quality-summary">
+            <div class="stat-row">
+                <span class="stat-label">Approved:</span>
+                <span class="stat-value success">{{ job.quality_result.approved|length if job.quality_result.approved else 0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Rejected:</span>
+                <span class="stat-value failure">{{ job.quality_result.rejected|length if job.quality_result.rejected else 0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Extracted Concepts:</span>
+                <span class="stat-value">{{ job.quality_result.extracted_concepts|length if job.quality_result.extracted_concepts else 0 }}</span>
+            </div>
+        </div>
+
+        {% if job.quality_result.extracted_concepts %}
+        <div class="concepts-list mt-1">
+            <h4>Extracted Concepts</h4>
+            <div class="concepts-row">
+                {% for concept in job.quality_result.extracted_concepts %}
+                <span class="concept-tag">{{ concept }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if job.quality_result.rejected %}
+        <div class="rejected-list mt-1">
+            <h4>Rejected Scenarios</h4>
+            {% for item in job.quality_result.rejected %}
+            <div class="rejected-item">
+                <strong>{{ item.name if item.name else 'Unknown' }}</strong>
+                {% if item.reason %}
+                <p class="rejection-reason">{{ item.reason }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="text-muted">No quality check data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Feature Selection Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Feature Selection
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.feature_selection %}
+
+        <h4>Selected Features ({{ job.feature_selection.selected_features|length if job.feature_selection.selected_features else 0 }})</h4>
+        {% if job.feature_selection.selected_features %}
+        <div class="feature-cards">
+            {% for feature in job.feature_selection.selected_features %}
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feature-identity">
+                        <code>{{ feature.layer }}</code> @ <strong>{{ feature.index }}</strong>
+                        {% if feature.concept %}<span class="concept-tag">{{ feature.concept }}</span>{% endif %}
+                    </div>
+                    <div class="feature-strength">
+                        Strength: <strong>{{ feature.recommended_strength if feature.recommended_strength else feature.strength if feature.strength else '?' }}</strong>
+                    </div>
+                </div>
+                <div class="feature-description">{{ feature.description if feature.description else 'No description' }}</div>
+                {% if feature.reasoning %}
+                <div class="feature-reasoning">
+                    <div class="reasoning-label">Selection Reasoning</div>
+                    <p>{{ feature.reasoning }}</p>
+                </div>
+                {% endif %}
+                {% if feature.strength_reasoning %}
+                <div class="feature-reasoning">
+                    <div class="reasoning-label">Strength Reasoning</div>
+                    <p>{{ feature.strength_reasoning }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No features selected.</p>
+        {% endif %}
+
+        {% if job.feature_selection.rejected_features %}
+        <h4 class="mt-1">Rejected Features ({{ job.feature_selection.rejected_features|length }})</h4>
+        <table class="features-table rejected">
+            <thead>
+                <tr>
+                    <th>Layer</th>
+                    <th>Index</th>
+                    <th>Description</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for feature in job.feature_selection.rejected_features %}
+                <tr>
+                    <td><code>{{ feature.layer }}</code></td>
+                    <td>{{ feature.index }}</td>
+                    <td>{{ feature.description if feature.description else 'N/A' }}</td>
+                    <td class="rejection-reason">{{ feature.rejection_reason if feature.rejection_reason else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if job.feature_selection.search_metadata %}
+        <h4 class="mt-1">Search Metadata (Per Concept)</h4>
+        {% for concept, meta in job.feature_selection.search_metadata.items() %}
+        <details class="concept-search-details">
+            <summary>
+                <strong>{{ concept }}</strong>
+                <span class="tag">{{ meta.formatted_results|length if meta.formatted_results else 0 }} results</span>
+            </summary>
+            <div class="search-meta-content">
+                <p><strong>Query:</strong> {{ meta.query }}</p>
+                <p><strong>Target Model:</strong> {{ meta.target_model }}</p>
+                {% if meta.error %}
+                <p class="error"><strong>Error:</strong> {{ meta.error }}</p>
+                {% endif %}
+                {% if meta.formatted_results %}
+                <table class="mini-table">
+                    <thead>
+                        <tr>
+                            <th>Layer</th>
+                            <th>Index</th>
+                            <th>Description</th>
+                            <th>Similarity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in meta.formatted_results[:10] %}
+                        <tr>
+                            <td><code>{{ result.layer }}</code></td>
+                            <td>{{ result.index }}</td>
+                            <td>{{ result.description[:60] if result.description else 'N/A' }}...</td>
+                            <td>{{ "%.4f"|format(result.similarity) if result.similarity else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if meta.formatted_results|length > 10 %}
+                <p class="text-muted">... and {{ meta.formatted_results|length - 10 }} more results</p>
+                {% endif %}
+                {% endif %}
+            </div>
+        </details>
+        {% endfor %}
+        {% endif %}
+
+        {% else %}
+        <p class="text-muted">No feature selection data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Steering Experiments Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Steering Experiments ({{ job.experiments|length if job.experiments else 0 }} features)
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.experiments %}
+        <p class="experiment-info">Each feature tested individually at strengths:
+            {% for s in job.config.test_strengths if job.config and job.config.test_strengths %}
+            <span class="strength-badge">{{ s }}</span>
+            {% else %}
+            <span class="text-muted">-10, -5, -2, 2, 5, 10</span>
+            {% endfor %}
+        </p>
+
+        <div class="experiments-list">
+            {% for experiment in job.experiments %}
+            <div class="experiment-item">
+                <div class="experiment-header">
+                    <div class="feature-info">
+                        <code>{{ experiment.feature.layer }}:{{ experiment.feature.index }}</code>
+                        <span class="feature-description">{{ experiment.feature.description[:80] if experiment.feature.description else 'No description' }}{% if experiment.feature.description and experiment.feature.description|length > 80 %}...{% endif %}</span>
+                    </div>
+                    {% if experiment.feature.concept %}
+                    <span class="concept-tag">{{ experiment.feature.concept }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="strength-results-grid">
+                    {% for strength, results in experiment.strength_results.items() %}
+                    <div class="strength-result-col">
+                        <h5>Strength {{ strength }}</h5>
+                        <div class="strength-scenarios">
+                            {% for result in results %}
+                            <details class="scenario-result {% if result.error %}has-error{% endif %}">
+                                <summary>
+                                    {{ result.scenario_name }}
+                                    {% if result.error %}<span class="tag error">Error</span>{% endif %}
+                                </summary>
+                                <div class="scenario-responses">
+                                    {% if result.error %}
+                                    <div class="error-message">{{ result.error }}</div>
+                                    {% else %}
+                                    <div class="response-pair">
+                                        <div class="response default">
+                                            <strong>Default:</strong>
+                                            <p>{{ result.default[:300] if result.default else 'No response' }}{% if result.default and result.default|length > 300 %}...{% endif %}</p>
+                                        </div>
+                                        <div class="response steered">
+                                            <strong>Steered:</strong>
+                                            <p>{{ result.steered[:300] if result.steered else 'No response' }}{% if result.steered and result.steered|length > 300 %}...{% endif %}</p>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </details>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No steering experiments data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Feature Evaluations Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Feature Evaluations ({{ job.feature_evaluations|length if job.feature_evaluations else 0 }})
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.feature_evaluations %}
+        <div class="feature-evaluations-list">
+            {% for feat_eval in job.feature_evaluations %}
+            <div class="feature-eval-item recommendation-{{ feat_eval.recommendation }}">
+                <div class="feat-eval-header">
+                    <div class="feature-info">
+                        <code>{{ feat_eval.feature.layer }}:{{ feat_eval.feature.index }}</code>
+                        <span class="feature-description">{{ feat_eval.feature.description[:60] if feat_eval.feature.description else '' }}{% if feat_eval.feature.description and feat_eval.feature.description|length > 60 %}...{% endif %}</span>
+                    </div>
+                    <div class="eval-badges">
+                        <span class="recommendation-badge {{ feat_eval.recommendation }}">
+                            {{ feat_eval.recommendation | replace('_', ' ') | title }}
+                        </span>
+                        {% if feat_eval.best_strength %}
+                        <span class="best-strength-badge">Best: {{ feat_eval.best_strength }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="success-rate-bar">
+                    <div class="success-rate-fill" style="width: {{ (feat_eval.best_score * 100)|int }}%"></div>
+                    <span class="success-rate-label">{{ (feat_eval.best_score * 100)|int }}% success rate (best strength)</span>
+                </div>
+
+                <!-- Strength Comparison Table -->
+                <div class="strength-comparison mt-1">
+                    <h5>Strength Comparison</h5>
+                    <table class="strength-table">
+                        <thead>
+                            <tr>
+                                <th>Strength</th>
+                                <th>Successes</th>
+                                <th>Failures</th>
+                                <th>Success Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for strength, data in feat_eval.strength_evaluations.items() %}
+                            <tr class="{% if strength == feat_eval.best_strength %}best-strength{% endif %}">
+                                <td>
+                                    <span class="strength-badge">{{ strength }}</span>
+                                    {% if strength == feat_eval.best_strength %}⭐{% endif %}
+                                </td>
+                                <td class="success-count">{{ data.successes }}</td>
+                                <td class="failure-count">{{ data.failures }}</td>
+                                <td>
+                                    <div class="mini-bar">
+                                        <div class="mini-fill" style="width: {{ (data.success_rate * 100)|int }}%"></div>
+                                    </div>
+                                    {{ (data.success_rate * 100)|int }}%
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Detailed Evaluations per Strength -->
+                <details class="strength-details">
+                    <summary>View Detailed Evaluations</summary>
+                    <div class="strength-evals-content">
+                        {% for strength, data in feat_eval.strength_evaluations.items() %}
+                        <div class="strength-eval-section">
+                            <h6>Strength {{ strength }} Evaluations</h6>
+                            {% for eval in data.evaluations %}
+                            <div class="scenario-eval {{ eval.evaluation.classification if eval.evaluation.classification else 'unknown' }}">
+                                <span class="scenario-name">{{ eval.scenario_name }}</span>
+                                <span class="classification-badge {{ eval.evaluation.classification if eval.evaluation.classification else 'unknown' }}">
+                                    {{ eval.evaluation.classification if eval.evaluation.classification else 'Unknown' }}
+                                </span>
+                                {% if eval.evaluation.recommendation %}
+                                <span class="eval-recommendation">{{ eval.evaluation.recommendation }}</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No feature evaluation data available.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Raw JSON Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Raw JSON Data
+    </h3>
+    <div class="section-content" style="display: none;">
+        <pre class="raw-json">{{ job | tojson(indent=2) }}</pre>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.textContent = '-';
+    } else {
+        content.style.display = 'none';
+        icon.textContent = '+';
+    }
+}
+
+// Auto-expand first few sections for better UX
+document.addEventListener('DOMContentLoaded', function() {
+    const headers = document.querySelectorAll('.section-header');
+    // Expand overview (first section is not collapsible)
+});
+</script>
+
+<style>
+.breadcrumb {
+    margin-bottom: 1rem;
+    color: #666;
+}
+
+.breadcrumb a {
+    color: #3b82f6;
+    text-decoration: none;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.75rem;
+}
+
+.summary-card {
+    background: #f5f5f5;
+    padding: 0.75rem;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.summary-card.success { background: #d1fae5; }
+.summary-card.failure { background: #fee2e2; }
+.summary-card.pending { background: #fef3c7; }
+
+.summary-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.summary-label {
+    display: block;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.collapsible .section-header {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+}
+
+.collapsible .section-header:hover {
+    color: #3b82f6;
+}
+
+.toggle-icon {
+    font-family: monospace;
+    font-weight: bold;
+    width: 1.5rem;
+    text-align: center;
+}
+
+.section-content {
+    padding-top: 1rem;
+}
+
+.template-item, .scenario-item, .steering-result-item, .evaluation-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.template-header, .scenario-header, .result-header, .eval-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.tag {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.tag.secondary { background: #f3f4f6; color: #4b5563; }
+.tag.error { background: #fee2e2; color: #991b1b; }
+
+.concept-tag {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    margin-right: 0.25rem;
+}
+
+.message {
+    padding: 0.5rem;
+    margin: 0.25rem 0;
+    border-radius: 4px;
+}
+
+.message.system { background: #fef3c7; }
+.message.user { background: #dbeafe; }
+.message.assistant { background: #d1fae5; }
+
+.message .role {
+    font-weight: bold;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.message .content {
+    margin-top: 0.25rem;
+    white-space: pre-wrap;
+}
+
+.messages-details, .eval-details, .concept-search-details {
+    margin-top: 0.5rem;
+}
+
+.messages-details summary, .eval-details summary, .concept-search-details summary {
+    cursor: pointer;
+    color: #3b82f6;
+    font-size: 0.9rem;
+}
+
+.features-table, .mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+}
+
+.features-table th, .features-table td,
+.mini-table th, .mini-table td {
+    border: 1px solid #e0e0e0;
+    padding: 0.5rem;
+    text-align: left;
+    font-size: 0.85rem;
+}
+
+.features-table th, .mini-table th {
+    background: #f5f5f5;
+}
+
+.features-table.rejected td {
+    background: #fef2f2;
+}
+
+.rejection-reason {
+    color: #dc2626;
+    font-style: italic;
+}
+
+.strategy-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.feature-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.feature-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.feature-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.feature-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.feature-strength {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.feature-description {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #1e293b;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.feature-reasoning {
+    margin-top: 0.75rem;
+}
+
+.feature-reasoning .reasoning-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.feature-reasoning p {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #334155;
+    margin: 0;
+}
+
+.response-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.response-col {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.response-col.default { border-left: 3px solid #9ca3af; }
+.response-col.steered { border-left: 3px solid #10b981; }
+
+.response-col h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.response-text {
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
+.error-message {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.classification-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.classification-badge.success { background: #d1fae5; color: #065f46; }
+.classification-badge.partial { background: #fef3c7; color: #92400e; }
+.classification-badge.failure { background: #fee2e2; color: #991b1b; }
+.classification-badge.inconclusive { background: #e5e7eb; color: #4b5563; }
+
+.confidence-bar {
+    background: #e5e7eb;
+    border-radius: 4px;
+    height: 20px;
+    position: relative;
+    margin: 0.5rem 0;
+}
+
+.confidence-fill {
+    background: linear-gradient(90deg, #3b82f6, #10b981);
+    height: 100%;
+    border-radius: 4px;
+}
+
+.confidence-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.recommendation {
+    font-size: 0.85rem;
+    margin: 0.5rem 0;
+}
+
+.recommendation .label { color: #666; }
+.recommendation .value { font-weight: 500; }
+
+.eval-content {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #f8fafc;
+    border-radius: 4px;
+}
+
+.analysis-section {
+    margin-bottom: 0.75rem;
+}
+
+.analysis-section h5 {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.analysis-section pre {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+}
+
+.feature-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.feature-tag {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+.raw-json {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.mt-1 { margin-top: 1rem; }
+.mb-1 { margin-bottom: 1rem; }
+.text-muted { color: #6b7280; }
+
+.stat-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label { color: #666; }
+.stat-value.success { color: #065f46; font-weight: bold; }
+.stat-value.failure { color: #991b1b; font-weight: bold; }
+
+.quality-summary {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.rejected-item {
+    background: #fef2f2;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.search-meta-content {
+    padding: 0.75rem;
+    background: #f8fafc;
+    margin-top: 0.5rem;
+}
+
+.error { color: #dc2626; }
+
+/* New experiment-based styles */
+.test-strengths-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.strength-badge {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.experiment-info {
+    margin-bottom: 1rem;
+    color: #666;
+}
+
+.experiment-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.experiment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.feature-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.feature-description {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.strength-results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.strength-result-col {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.strength-result-col h5 {
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.scenario-result {
+    margin-bottom: 0.5rem;
+}
+
+.scenario-result summary {
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+}
+
+.scenario-result summary:hover {
+    background: #f5f5f5;
+}
+
+.scenario-result.has-error summary {
+    background: #fef2f2;
+}
+
+.scenario-responses {
+    padding: 0.5rem;
+    background: #f8fafc;
+    margin-top: 0.25rem;
+}
+
+.response-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.response.default {
+    background: #f3f4f6;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border-left: 3px solid #9ca3af;
+}
+
+.response.steered {
+    background: #ecfdf5;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border-left: 3px solid #10b981;
+}
+
+.response p {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.85rem;
+}
+
+/* Feature Evaluations */
+.feature-eval-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.feature-eval-item.recommendation-include_in_training {
+    border-left: 4px solid #10b981;
+}
+
+.feature-eval-item.recommendation-flag_for_review {
+    border-left: 4px solid #f59e0b;
+}
+
+.feature-eval-item.recommendation-reject {
+    border-left: 4px solid #ef4444;
+}
+
+.feat-eval-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.eval-badges {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.recommendation-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.recommendation-badge.include_in_training {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.recommendation-badge.flag_for_review {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.recommendation-badge.reject {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.best-strength-badge {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.success-rate-bar {
+    background: #e5e7eb;
+    border-radius: 4px;
+    height: 24px;
+    position: relative;
+}
+
+.success-rate-fill {
+    background: linear-gradient(90deg, #10b981, #059669);
+    height: 100%;
+    border-radius: 4px;
+}
+
+.success-rate-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.strength-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+}
+
+.strength-table th, .strength-table td {
+    border: 1px solid #e0e0e0;
+    padding: 0.5rem;
+    text-align: left;
+    font-size: 0.85rem;
+}
+
+.strength-table th {
+    background: #f5f5f5;
+}
+
+.strength-table tr.best-strength {
+    background: #f0fdf4;
+}
+
+.success-count { color: #065f46; }
+.failure-count { color: #991b1b; }
+
+.mini-bar {
+    width: 60px;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    display: inline-block;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+
+.mini-fill {
+    height: 100%;
+    background: #10b981;
+    border-radius: 4px;
+}
+
+.strength-details {
+    margin-top: 0.75rem;
+}
+
+.strength-eval-section {
+    margin-bottom: 0.75rem;
+}
+
+.strength-eval-section h6 {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.85rem;
+}
+
+.scenario-eval {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+}
+
+.scenario-eval.success { background: #ecfdf5; }
+.scenario-eval.partial { background: #fffbeb; }
+.scenario-eval.failure { background: #fef2f2; }
+.scenario-eval.inconclusive { background: #f3f4f6; }
+
+.scenario-name {
+    flex-grow: 1;
+}
+
+.eval-recommendation {
+    font-size: 0.7rem;
+    color: #666;
+}
+
+@media (max-width: 768px) {
+    .response-comparison {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .strength-results-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .feat-eval-header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .insights-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Quick Insights Card */
+.quick-insights-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.quick-insights-card h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    color: #0369a1;
+}
+
+.insights-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.insights-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.insights-header {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.insight-row {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.insight-label {
+    color: #64748b;
+    min-width: 90px;
+}
+
+.insight-value {
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.success-text { color: #059669; }
+.warning-text { color: #d97706; }
+.failure-text { color: #dc2626; }
+</style>
+{% endblock %}

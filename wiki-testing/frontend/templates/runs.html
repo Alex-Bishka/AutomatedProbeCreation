@@ -63,6 +63,7 @@
             </td>
             <td class="text-right" style="white-space: nowrap;">
                 <a href="{{ url_for('run_detail_page', filename=run.filename) }}" class="btn small">View</a>
+                <button class="btn small" onclick="invalidateRun('{{ run.filename }}', this)" title="Mark as invalid">Invalidate</button>
                 <button class="btn small danger" onclick="deleteRun('{{ run.filename }}', this)" title="Delete this run">Delete</button>
             </td>
         </tr>
@@ -72,6 +73,81 @@
 {% else %}
 <p class="text-muted">No runs yet. <a href="{{ url_for('run_page') }}">Run some scenarios</a> to get started.</p>
 {% endif %}
+
+<!-- Invalid Runs Section -->
+<div class="archive-section mt-2">
+    <h4 class="collapsible" onclick="toggleInvalidRuns(this)" style="cursor: pointer;">
+        Invalid Runs <span class="text-muted text-small">(<span id="invalid-runs-count">{{ invalid_runs|length }}</span>)</span>
+    </h4>
+    <div id="invalid-runs-content" class="collapsible-content">
+        {% if invalid_runs %}
+        <table style="opacity: 0.7;">
+            <thead>
+                <tr>
+                    <th style="width: 30px;"></th>
+                    <th>Timestamp</th>
+                    <th>Category</th>
+                    <th>Model</th>
+                    <th>Features</th>
+                    <th>Scenarios</th>
+                    <th style="width: 80px;">Score</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="invalid-runs-tbody">
+                {% for run in invalid_runs %}
+                {% set cat = cat_lookup.get(run.category) if run.category else None %}
+                <tr class="run-row invalid-run-row" data-score="{{ run.score if run.score is not none else '' }}" data-filename="{{ run.filename }}">
+                    <td>
+                        <span class="star-toggle" data-filename="{{ run.filename }}"
+                              onclick="toggleStar('{{ run.filename }}', this)"
+                              title="Star this run">
+                            {% if run.starred %}&#9733;{% else %}&#9734;{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('run_detail_page', filename=run.filename) }}">
+                            {{ run.timestamp[:4] }}-{{ run.timestamp[4:6] }}-{{ run.timestamp[6:8] }}
+                            {{ run.timestamp[9:11] }}:{{ run.timestamp[11:13] }}:{{ run.timestamp[13:15] }}
+                        </a>
+                    </td>
+                    <td>
+                        {% if cat %}
+                        <span class="category-badge" style="background: {{ cat.color }}20; color: {{ cat.color }}; border: 1px solid {{ cat.color }};">
+                            {{ cat.name }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted text-small">All/Mixed</span>
+                        {% endif %}
+                    </td>
+                    <td><code>{{ run.model }}</code></td>
+                    <td>
+                        {% for f in run.features %}
+                        <div class="text-small">
+                            <code>L{{ f.layer.split('-')[0] }}:{{ f.index }}</code> ({{ f.strength }}){% if f.description %} - <em>{{ f.description }}</em>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </td>
+                    <td>{{ run.results|length }} scenarios</td>
+                    <td>
+                        <span class="score-cell" data-score="{{ run.score if run.score is not none else '' }}">
+                            {{ run.score_display }}
+                        </span>
+                    </td>
+                    <td class="text-right" style="white-space: nowrap;">
+                        <a href="{{ url_for('run_detail_page', filename=run.filename) }}" class="btn small">View</a>
+                        <button class="btn small" onclick="restoreRun('{{ run.filename }}', this)" title="Restore this run">Restore</button>
+                        <button class="btn small danger" onclick="deleteRun('{{ run.filename }}', this)" title="Delete this run">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted" id="no-invalid-runs-msg">No invalid runs.</p>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -99,10 +175,45 @@
             // Remove the row from the table
             const row = button.closest('tr');
             if (row) row.remove();
+            // Update invalid count if deleted from invalid section
+            updateInvalidCount();
         } catch (error) {
             console.error('Error deleting run:', error);
             alert('Failed to delete run: ' + error.message);
         }
+    }
+
+    async function invalidateRun(filename, button) {
+        try {
+            await apiCall('/api/runs/invalid', 'POST', { filename, invalid: true });
+            // Reload page to update tables
+            location.reload();
+        } catch (error) {
+            console.error('Error invalidating run:', error);
+            alert('Failed to invalidate run: ' + error.message);
+        }
+    }
+
+    async function restoreRun(filename, button) {
+        try {
+            await apiCall('/api/runs/invalid', 'POST', { filename, invalid: false });
+            // Reload page to update tables
+            location.reload();
+        } catch (error) {
+            console.error('Error restoring run:', error);
+            alert('Failed to restore run: ' + error.message);
+        }
+    }
+
+    function toggleInvalidRuns(element) {
+        element.classList.toggle('expanded');
+        const content = document.getElementById('invalid-runs-content');
+        content.classList.toggle('show');
+    }
+
+    function updateInvalidCount() {
+        const invalidRows = document.querySelectorAll('#invalid-runs-tbody tr');
+        document.getElementById('invalid-runs-count').textContent = invalidRows.length;
     }
 
     function getScoreColor(score) {

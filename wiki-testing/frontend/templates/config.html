@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline Configuration{% endblock %}
+
+{% block content %}
+<h2>Pipeline Configuration</h2>
+<p>View and edit the automated pipeline settings. Changes are saved to <code>pipeline_config.json</code>.</p>
+
+<div id="save-status" class="save-status" style="display: none;"></div>
+
+<!-- Model Configuration -->
+<div class="section">
+    <h3>Model Configuration</h3>
+    <p class="section-desc">Configure which LLM models power the pipeline agents.</p>
+
+    <div class="form-group">
+        <label for="model-default">Default Model</label>
+        <input type="text" id="model-default" value="{{ config.models.default if config.models else 'google/gemini-2.5-flash' }}">
+        <span class="form-hint">Used for most agent operations (ScenarioCreator, FeatureSelector, etc.)</span>
+    </div>
+
+    <div class="form-group">
+        <label for="model-high-quality">High Quality Model</label>
+        <input type="text" id="model-high-quality" value="{{ config.models.high_quality if config.models else 'google/gemini-2.5-pro' }}">
+        <span class="form-hint">Used when "High Quality Mode" is enabled</span>
+    </div>
+</div>
+
+<!-- Pipeline Defaults -->
+<div class="section">
+    <h3>Pipeline Defaults</h3>
+    <p class="section-desc">Default values for pipeline runs.</p>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="num-scenarios">Number of Scenarios</label>
+            <input type="number" id="num-scenarios" value="{{ config.pipeline_defaults.num_scenarios if config.pipeline_defaults else 10 }}" min="1" max="50">
+        </div>
+
+        <div class="form-group">
+            <label for="max-features">Max Features per Concept</label>
+            <input type="number" id="max-features" value="{{ config.pipeline_defaults.max_features_per_concept if config.pipeline_defaults else 3 }}" min="1" max="20">
+        </div>
+
+        <div class="form-group">
+            <label for="topk-results">Top-K Search Results</label>
+            <input type="number" id="topk-results" value="{{ config.pipeline_defaults.topk_search_results if config.pipeline_defaults else 20 }}" min="5" max="100">
+        </div>
+
+        <div class="form-group">
+            <label for="min-success">Min Success for Probe</label>
+            <input type="number" id="min-success" value="{{ config.pipeline_defaults.min_success_for_probe if config.pipeline_defaults else 5 }}" min="1" max="50">
+        </div>
+    </div>
+</div>
+
+<!-- Steering Parameters -->
+<div class="section">
+    <h3>Steering Parameters</h3>
+    <p class="section-desc">Parameters passed to Neuronpedia's steering API.</p>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="steer-temperature">Temperature</label>
+            <input type="number" id="steer-temperature" value="{{ config.steering_params.temperature if config.steering_params else 0.8 }}" step="0.1" min="0" max="2">
+        </div>
+
+        <div class="form-group">
+            <label for="steer-n-tokens">Max Tokens</label>
+            <input type="number" id="steer-n-tokens" value="{{ config.steering_params.n_tokens if config.steering_params else 128 }}" min="16" max="512">
+        </div>
+
+        <div class="form-group">
+            <label for="steer-freq-penalty">Frequency Penalty</label>
+            <input type="number" id="steer-freq-penalty" value="{{ config.steering_params.freq_penalty if config.steering_params else 1 }}" step="0.1" min="0" max="2">
+        </div>
+
+        <div class="form-group">
+            <label for="steer-seed">Random Seed</label>
+            <input type="number" id="steer-seed" value="{{ config.steering_params.seed if config.steering_params else 16 }}" min="0">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="steer-strength">Strength Multiplier</label>
+            <input type="number" id="steer-strength" value="{{ config.steering_params.strength_multiplier if config.steering_params else 1 }}" step="0.1" min="0" max="10">
+        </div>
+
+        <div class="form-group">
+            <label for="steer-method">Steering Method</label>
+            <select id="steer-method">
+                <option value="SIMPLE_ADDITIVE" {% if config.steering_params and config.steering_params.steer_method == 'SIMPLE_ADDITIVE' %}selected{% endif %}>Simple Additive</option>
+                <option value="ABLATION" {% if config.steering_params and config.steering_params.steer_method == 'ABLATION' %}selected{% endif %}>Ablation</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="test-strengths">Test Strengths</label>
+            <input type="text" id="test-strengths" value="{{ config.steering_params.test_strengths | join(', ') if config.steering_params and config.steering_params.test_strengths else '-10, -5, -2, 2, 5, 10' }}">
+            <span class="form-hint">Comma-separated strength values (negative=suppress, positive=amplify)</span>
+        </div>
+
+        <div class="form-group">
+            <label for="max-combined">Max Combined Features</label>
+            <input type="number" id="max-combined" value="{{ config.steering_params.max_combined_features if config.steering_params else 3 }}" min="1" max="10">
+            <span class="form-hint">Max features to combine in compositional steering</span>
+        </div>
+    </div>
+</div>
+
+<!-- Vetted Categories -->
+<div class="section">
+    <h3>Vetted Categories</h3>
+    <p class="section-desc">Categories containing template scenarios for the pipeline. Only scenarios from these categories are used as templates.</p>
+
+    <div id="categories-list" class="categories-list">
+        {% if config.vetted_categories %}
+        {% for cat in config.vetted_categories %}
+        <div class="category-item" data-id="{{ cat.id }}">
+            <span class="category-name">{{ cat.name }}</span>
+            <code class="category-id">{{ cat.id }}</code>
+            <button class="btn-icon remove-cat" onclick="removeCategory('{{ cat.id }}')" title="Remove">X</button>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="add-category-form">
+        <input type="text" id="new-cat-id" placeholder="Category ID (e.g., cat_1_1234567890)">
+        <input type="text" id="new-cat-name" placeholder="Category Name">
+        <button class="btn" onclick="addCategory()">Add Category</button>
+    </div>
+</div>
+
+<!-- Agent Prompts -->
+<div class="section">
+    <h3>Agent System Prompts</h3>
+    <p class="section-desc">Override the default system prompts for each agent. Leave blank to use defaults.</p>
+
+    {% for agent in agents %}
+    <div class="agent-prompt-section">
+        <div class="agent-header" onclick="togglePrompt('{{ agent.name }}')">
+            <span class="toggle-icon" id="toggle-{{ agent.name }}">+</span>
+            <strong>{{ agent.display_name }}</strong>
+            <span class="agent-purpose">{{ agent.purpose }}</span>
+            {% if config.agent_prompt_overrides and config.agent_prompt_overrides[agent.name] %}
+            <span class="override-badge">Custom</span>
+            {% endif %}
+        </div>
+        <div class="agent-prompt-content" id="prompt-{{ agent.name }}" style="display: none;">
+            <div class="default-prompt">
+                <h5>Default Prompt:</h5>
+                <pre>{{ agent.default_prompt[:500] }}{% if agent.default_prompt|length > 500 %}...{% endif %}</pre>
+            </div>
+            <div class="form-group">
+                <label for="override-{{ agent.name }}">Custom Prompt Override (leave blank for default):</label>
+                <textarea id="override-{{ agent.name }}" rows="8" placeholder="Enter custom system prompt...">{{ config.agent_prompt_overrides[agent.name] if config.agent_prompt_overrides and config.agent_prompt_overrides[agent.name] else '' }}</textarea>
+            </div>
+            <button class="btn secondary" onclick="clearPromptOverride('{{ agent.name }}')">Clear Override</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Save Button -->
+<div class="save-section">
+    <button class="btn primary large" onclick="saveConfig()">Save Configuration</button>
+    <button class="btn secondary" onclick="resetConfig()">Reset to Defaults</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let categories = {{ config.vetted_categories | tojson if config.vetted_categories else '[]' }};
+
+function togglePrompt(agentName) {
+    const content = document.getElementById(`prompt-${agentName}`);
+    const icon = document.getElementById(`toggle-${agentName}`);
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.textContent = '-';
+    } else {
+        content.style.display = 'none';
+        icon.textContent = '+';
+    }
+}
+
+function addCategory() {
+    const id = document.getElementById('new-cat-id').value.trim();
+    const name = document.getElementById('new-cat-name').value.trim();
+
+    if (!id || !name) {
+        alert('Please enter both ID and name');
+        return;
+    }
+
+    if (categories.find(c => c.id === id)) {
+        alert('Category with this ID already exists');
+        return;
+    }
+
+    categories.push({ id, name });
+    renderCategories();
+
+    document.getElementById('new-cat-id').value = '';
+    document.getElementById('new-cat-name').value = '';
+}
+
+function removeCategory(id) {
+    categories = categories.filter(c => c.id !== id);
+    renderCategories();
+}
+
+function renderCategories() {
+    const list = document.getElementById('categories-list');
+    list.innerHTML = categories.map(cat => `
+        <div class="category-item" data-id="${cat.id}">
+            <span class="category-name">${cat.name}</span>
+            <code class="category-id">${cat.id}</code>
+            <button class="btn-icon remove-cat" onclick="removeCategory('${cat.id}')" title="Remove">X</button>
+        </div>
+    `).join('');
+}
+
+function clearPromptOverride(agentName) {
+    document.getElementById(`override-${agentName}`).value = '';
+}
+
+async function saveConfig() {
+    const agentNames = [{% for agent in agents %}'{{ agent.name }}',{% endfor %}];
+    const promptOverrides = {};
+
+    agentNames.forEach(name => {
+        const val = document.getElementById(`override-${name}`);
+        if (val && val.value.trim()) {
+            promptOverrides[name] = val.value.trim();
+        }
+    });
+
+    const config = {
+        models: {
+            default: document.getElementById('model-default').value,
+            high_quality: document.getElementById('model-high-quality').value
+        },
+        pipeline_defaults: {
+            num_scenarios: parseInt(document.getElementById('num-scenarios').value),
+            max_features_per_concept: parseInt(document.getElementById('max-features').value),
+            topk_search_results: parseInt(document.getElementById('topk-results').value),
+            min_success_for_probe: parseInt(document.getElementById('min-success').value)
+        },
+        steering_params: {
+            temperature: parseFloat(document.getElementById('steer-temperature').value),
+            n_tokens: parseInt(document.getElementById('steer-n-tokens').value),
+            freq_penalty: parseFloat(document.getElementById('steer-freq-penalty').value),
+            seed: parseInt(document.getElementById('steer-seed').value),
+            strength_multiplier: parseFloat(document.getElementById('steer-strength').value),
+            steer_method: document.getElementById('steer-method').value,
+            test_strengths: document.getElementById('test-strengths').value
+                .split(',')
+                .map(s => parseInt(s.trim()))
+                .filter(n => !isNaN(n)),
+            max_combined_features: parseInt(document.getElementById('max-combined').value)
+        },
+        vetted_categories: categories,
+        agent_prompt_overrides: promptOverrides
+    };
+
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showStatus('Configuration saved successfully!', 'success');
+        } else {
+            showStatus('Error saving configuration: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showStatus('Error saving configuration: ' + error.message, 'error');
+    }
+}
+
+async function resetConfig() {
+    if (!confirm('Are you sure you want to reset to default configuration? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/config/reset', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.success) {
+            showStatus('Configuration reset to defaults. Reloading...', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showStatus('Error resetting configuration: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showStatus('Error resetting configuration: ' + error.message, 'error');
+    }
+}
+
+function showStatus(message, type) {
+    const status = document.getElementById('save-status');
+    status.textContent = message;
+    status.className = `save-status ${type}`;
+    status.style.display = 'block';
+
+    if (type === 'success') {
+        setTimeout(() => { status.style.display = 'none'; }, 3000);
+    }
+}
+</script>
+
+<style>
+.section-desc {
+    color: #666;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.form-hint {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.categories-list {
+    margin-bottom: 1rem;
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.category-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.category-id {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #ef4444;
+    font-weight: bold;
+    padding: 0.25rem 0.5rem;
+}
+
+.btn-icon:hover {
+    background: #fee2e2;
+    border-radius: 4px;
+}
+
+.add-category-form {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.add-category-form input {
+    flex: 1;
+    min-width: 150px;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.agent-prompt-section {
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.agent-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    background: #f8fafc;
+    border-radius: 6px 6px 0 0;
+}
+
+.agent-header:hover {
+    background: #f1f5f9;
+}
+
+.toggle-icon {
+    font-family: monospace;
+    font-weight: bold;
+    width: 1.5rem;
+    text-align: center;
+}
+
+.agent-purpose {
+    color: #666;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+.override-badge {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.agent-prompt-content {
+    padding: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.default-prompt {
+    margin-bottom: 1rem;
+}
+
+.default-prompt h5 {
+    margin: 0 0 0.5rem 0;
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.default-prompt pre {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+.save-section {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding: 1rem 0;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.btn.large {
+    padding: 0.75rem 2rem;
+    font-size: 1.1rem;
+}
+
+.btn.secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.btn.secondary:hover {
+    background: #d1d5db;
+}
+
+.save-status {
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.save-status.success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+}
+
+.save-status.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+}
+</style>
+{% endblock %}

@@ -15,6 +15,138 @@
     <button onclick="updateModel()" class="btn">Update Model</button>
 </div>
 
+<h3>Feature Categories</h3>
+
+<p class="text-small text-muted">Group features into categories for quick activation/deactivation. Categories act as presets that can be added to or removed from the working set.</p>
+
+<div class="mb-1" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    <button onclick="showCreateCategory()" class="btn small">Create Category</button>
+</div>
+
+<div id="feature-categories-list" class="feature-set">
+    {% if feature_categories %}
+        {% for cat in feature_categories %}
+        <div class="feature-category-item" data-id="{{ cat.id }}" style="border-left: 4px solid {{ cat.color }};">
+            <div class="category-header-row">
+                <div class="category-info">
+                    <strong>{{ cat.name }}</strong>
+                    <span class="text-muted text-small">({{ cat.features|length }} features)</span>
+                </div>
+                <div class="category-actions">
+                    <button class="btn small primary" onclick="activateCategory('{{ cat.id }}')" title="Add all features to working set">Activate</button>
+                    <button class="btn small" onclick="deactivateCategory('{{ cat.id }}')" title="Remove all features from working set">Deactivate</button>
+                    <button class="btn small" onclick="editCategory('{{ cat.id }}')">Edit</button>
+                    <button class="btn small" onclick="archiveCategory('{{ cat.id }}')" title="Move to archive">Archive</button>
+                </div>
+            </div>
+            <div class="category-features-preview text-small text-muted">
+                {% for f in cat.features[:3] %}
+                <span class="feature-tag">{{ f.layer }}:{{ f.index }}</span>
+                {% endfor %}
+                {% if cat.features|length > 3 %}
+                <span>+{{ cat.features|length - 3 }} more</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted" id="no-categories-msg">No feature categories yet. Create one to group related features.</p>
+    {% endif %}
+</div>
+
+<!-- Archived Categories Section -->
+<div class="archive-section mt-2">
+    <h4 class="collapsible" onclick="toggleArchivedCategories(this)" style="cursor: pointer;">
+        Archived Categories <span class="text-muted text-small">(<span id="archived-categories-count">{{ archived_feature_categories|length }}</span>)</span>
+    </h4>
+    <div id="archived-categories-content" class="collapsible-content">
+        <div id="archived-categories-list" class="feature-set" style="max-height: 200px; overflow-y: auto;">
+            {% if archived_feature_categories %}
+                {% for cat in archived_feature_categories %}
+                <div class="feature-category-item archived" data-id="{{ cat.id }}" style="border-left: 4px solid {{ cat.color }}; opacity: 0.7;">
+                    <div class="category-header-row">
+                        <div class="category-info">
+                            <strong>{{ cat.name }}</strong>
+                            <span class="text-muted text-small">({{ cat.features|length }} features)</span>
+                        </div>
+                        <div class="category-actions">
+                            <button class="btn small" onclick="restoreCategory('{{ cat.id }}')">Restore</button>
+                            <button class="btn small danger" onclick="deleteCategory('{{ cat.id }}')">Delete</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted" id="no-archived-categories-msg">No archived categories.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Create Category Modal -->
+<div id="create-category-modal" class="modal hidden">
+    <div class="card" style="min-width: 400px; max-width: 500px;">
+        <div class="card-header">
+            <h3 class="card-title">Create Feature Category</h3>
+            <button class="btn small" onclick="hideCreateCategory()">Close</button>
+        </div>
+        <div class="form-row">
+            <label for="new-category-name">Category Name</label>
+            <input type="text" id="new-category-name" placeholder="e.g., Corporate Loyalty Features">
+        </div>
+        <div class="form-row">
+            <label for="new-category-color">Color</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="color" id="new-category-color" value="#3b82f6" style="width: 60px; padding: 0; cursor: pointer; margin-bottom: 0;"
+                       onchange="document.getElementById('new-category-hex').value = this.value">
+                <input type="text" id="new-category-hex" value="#3b82f6" placeholder="#3b82f6"
+                       style="width: 100px; margin-bottom: 0; font-family: var(--font-mono); font-size: 0.9rem;"
+                       onchange="syncColorFromHex('new-category')">
+            </div>
+        </div>
+        <div class="mt-1">
+            <button onclick="createCategory()" class="btn primary">Create Category</button>
+            <button onclick="hideCreateCategory()" class="btn">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div id="edit-category-modal" class="modal hidden">
+    <div class="card" style="min-width: 600px; max-width: 800px; max-height: 90vh; overflow-y: auto;">
+        <div class="card-header">
+            <h3 class="card-title">Edit Category: <span id="edit-category-name-display"></span></h3>
+            <button class="btn small" onclick="hideEditCategory()">Close</button>
+        </div>
+        <div class="form-row">
+            <label for="edit-category-name">Category Name</label>
+            <input type="text" id="edit-category-name">
+        </div>
+        <div class="form-row">
+            <label for="edit-category-color">Color</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="color" id="edit-category-color" style="width: 60px; padding: 0; cursor: pointer; margin-bottom: 0;"
+                       onchange="document.getElementById('edit-category-hex').value = this.value">
+                <input type="text" id="edit-category-hex" placeholder="#3b82f6"
+                       style="width: 100px; margin-bottom: 0; font-family: var(--font-mono); font-size: 0.9rem;"
+                       onchange="syncColorFromHex('edit-category')">
+            </div>
+        </div>
+
+        <h4 style="margin-top: 1rem;">Features in this Category</h4>
+        <div id="edit-category-features" class="feature-set" style="max-height: 250px; overflow-y: auto;"></div>
+
+        <h4 style="margin-top: 1rem;">Add Features from Working Set</h4>
+        <p class="text-small text-muted">Click a feature below to add it to this category.</p>
+        <div id="working-set-for-category" class="feature-set" style="max-height: 200px; overflow-y: auto;"></div>
+
+        <div class="mt-2">
+            <button onclick="saveCategoryChanges()" class="btn primary">Save Changes</button>
+            <button onclick="hideEditCategory()" class="btn">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <h3>Current Feature Set</h3>
 
 <p class="text-small text-muted">Toggle features on/off for runs. Adjust strength inline. Only enabled features will be used during runs.</p>
@@ -107,6 +239,9 @@
 <script>
     let currentOffset = 0;
     let currentQuery = '';
+    let editingCategoryId = null;
+    let editingCategoryFeatures = [];
+    let currentWorkingSetFeatures = [];
 
     function escapeHtml(text) {
         if (!text) return '';
@@ -333,7 +468,7 @@
                 modelId: model,
                 layer: layer,
                 index: index,
-                strength: 10,
+                strength: 5,
                 description: description
             });
 
@@ -386,5 +521,314 @@
         `;
         list.appendChild(div);
     }
+
+    // ============== Feature Category Functions ==============
+
+    function toggleArchivedCategories(element) {
+        element.classList.toggle('expanded');
+        const content = document.getElementById('archived-categories-content');
+        content.classList.toggle('show');
+    }
+
+    function syncColorFromHex(prefix) {
+        const hexInput = document.getElementById(`${prefix}-hex`);
+        const colorPicker = document.getElementById(`${prefix}-color`);
+        let hex = hexInput.value.trim();
+
+        // Add # if missing
+        if (hex && !hex.startsWith('#')) {
+            hex = '#' + hex;
+        }
+
+        // Validate hex format
+        if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+            colorPicker.value = hex;
+            hexInput.value = hex;
+        } else if (/^#[0-9A-Fa-f]{3}$/.test(hex)) {
+            // Expand shorthand (e.g., #abc -> #aabbcc)
+            const expanded = '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+            colorPicker.value = expanded;
+            hexInput.value = expanded;
+        }
+    }
+
+    function showCreateCategory() {
+        document.getElementById('new-category-name').value = '';
+        document.getElementById('new-category-color').value = '#3b82f6';
+        document.getElementById('new-category-hex').value = '#3b82f6';
+        document.getElementById('create-category-modal').classList.remove('hidden');
+    }
+
+    function hideCreateCategory() {
+        document.getElementById('create-category-modal').classList.add('hidden');
+    }
+
+    async function createCategory() {
+        const name = document.getElementById('new-category-name').value.trim();
+        const color = document.getElementById('new-category-color').value;
+
+        if (!name) {
+            alert('Please enter a category name');
+            return;
+        }
+
+        try {
+            await apiCall('/api/feature-categories', 'POST', { name, color });
+            location.reload();
+        } catch (error) {
+            alert('Error creating category: ' + error.message);
+        }
+    }
+
+    async function activateCategory(categoryId) {
+        try {
+            const result = await apiCall(`/api/feature-categories/${categoryId}/activate`, 'POST');
+            if (result.added_count > 0) {
+                location.reload();
+            } else {
+                alert('All features from this category are already in the working set.');
+            }
+        } catch (error) {
+            alert('Error activating category: ' + error.message);
+        }
+    }
+
+    async function deactivateCategory(categoryId) {
+        try {
+            const result = await apiCall(`/api/feature-categories/${categoryId}/deactivate`, 'POST');
+            if (result.removed_count > 0) {
+                location.reload();
+            } else {
+                alert('No features from this category were in the working set.');
+            }
+        } catch (error) {
+            alert('Error deactivating category: ' + error.message);
+        }
+    }
+
+    async function archiveCategory(categoryId) {
+        try {
+            await apiCall(`/api/feature-categories/${categoryId}/archive`, 'POST', { archived: true });
+            location.reload();
+        } catch (error) {
+            alert('Error archiving category: ' + error.message);
+        }
+    }
+
+    async function restoreCategory(categoryId) {
+        try {
+            await apiCall(`/api/feature-categories/${categoryId}/archive`, 'POST', { archived: false });
+            location.reload();
+        } catch (error) {
+            alert('Error restoring category: ' + error.message);
+        }
+    }
+
+    async function deleteCategory(categoryId) {
+        if (!confirm('Are you sure you want to permanently delete this category?')) return;
+
+        try {
+            await apiCall(`/api/feature-categories/${categoryId}`, 'DELETE');
+            location.reload();
+        } catch (error) {
+            alert('Error deleting category: ' + error.message);
+        }
+    }
+
+    async function editCategory(categoryId) {
+        try {
+            const category = await apiCall(`/api/feature-categories/${categoryId}`);
+            const featureSet = await apiCall('/api/features');
+
+            editingCategoryId = categoryId;
+            editingCategoryFeatures = [...(category.features || [])];
+            currentWorkingSetFeatures = featureSet.features || [];
+
+            document.getElementById('edit-category-name').value = category.name;
+            document.getElementById('edit-category-name-display').textContent = category.name;
+            document.getElementById('edit-category-color').value = category.color;
+            document.getElementById('edit-category-hex').value = category.color;
+
+            renderCategoryFeatures();
+            renderWorkingSetForCategory(featureSet.features);
+
+            document.getElementById('edit-category-modal').classList.remove('hidden');
+        } catch (error) {
+            alert('Error loading category: ' + error.message);
+        }
+    }
+
+    function hideEditCategory() {
+        document.getElementById('edit-category-modal').classList.add('hidden');
+        editingCategoryId = null;
+        editingCategoryFeatures = [];
+    }
+
+    function renderCategoryFeatures() {
+        const container = document.getElementById('edit-category-features');
+        container.innerHTML = '';
+
+        if (editingCategoryFeatures.length === 0) {
+            container.innerHTML = '<p class="text-muted">No features in this category yet.</p>';
+            return;
+        }
+
+        editingCategoryFeatures.forEach((f, index) => {
+            // Check if this feature is already in the working set
+            const inWorkingSet = currentWorkingSetFeatures.some(
+                wf => wf.layer === f.layer && String(wf.index) === String(f.index)
+            );
+
+            const div = document.createElement('div');
+            div.className = 'archive-item';
+            div.innerHTML = `
+                <div class="feature-info" style="flex: 1;">
+                    <div><code>${f.layer}</code> : ${f.index}</div>
+                    ${f.description ? `<div class="text-small text-muted">${escapeHtml(f.description)}</div>` : ''}
+                </div>
+                <div class="feature-controls" style="gap: 0.25rem;">
+                    <label style="font-size: 0.75rem;">Str:</label>
+                    <input type="number" value="${f.strength || 5}" min="-100" max="100" step="1"
+                           style="width: 60px;" onchange="updateCategoryFeatureStrength(${index}, this.value)">
+                    ${inWorkingSet
+                        ? '<span class="status success" style="font-size: 0.75rem;">In set</span>'
+                        : `<button class="btn small primary" onclick="addCategoryFeatureToWorkingSet(${index})" title="Add to working set">Add</button>`
+                    }
+                    <button class="btn small danger" onclick="removeCategoryFeature(${index})">Remove</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function renderWorkingSetForCategory(workingSetFeatures) {
+        const container = document.getElementById('working-set-for-category');
+        container.innerHTML = '';
+
+        if (!workingSetFeatures || workingSetFeatures.length === 0) {
+            container.innerHTML = '<p class="text-muted">No features in working set.</p>';
+            return;
+        }
+
+        workingSetFeatures.forEach(f => {
+            // Check if already in category
+            const inCategory = editingCategoryFeatures.some(
+                cf => cf.layer === f.layer && String(cf.index) === String(f.index)
+            );
+
+            const div = document.createElement('div');
+            div.className = 'archive-item' + (inCategory ? ' added' : '');
+            div.style.cursor = inCategory ? 'default' : 'pointer';
+            div.style.opacity = inCategory ? '0.5' : '1';
+
+            div.innerHTML = `
+                <div class="feature-info" style="flex: 1;">
+                    <div><code>${f.layer}</code> : ${f.index}</div>
+                    ${f.description ? `<div class="text-small text-muted">${escapeHtml(f.description)}</div>` : ''}
+                </div>
+                ${inCategory ? '<span class="status success">In category</span>' : '<span class="text-muted">Click to add</span>'}
+            `;
+
+            if (!inCategory) {
+                div.onclick = () => addFeatureToCategory(f);
+            }
+
+            container.appendChild(div);
+        });
+    }
+
+    function addFeatureToCategory(feature) {
+        // Check if already in category
+        const exists = editingCategoryFeatures.some(
+            f => f.layer === feature.layer && String(f.index) === String(feature.index)
+        );
+
+        if (!exists) {
+            editingCategoryFeatures.push({
+                layer: feature.layer,
+                index: parseInt(feature.index),
+                strength: feature.strength || 5,
+                description: feature.description || ''
+            });
+            renderCategoryFeatures();
+            // Re-render working set to show updated status
+            apiCall('/api/features').then(featureSet => {
+                renderWorkingSetForCategory(featureSet.features);
+            });
+        }
+    }
+
+    function removeCategoryFeature(index) {
+        editingCategoryFeatures.splice(index, 1);
+        renderCategoryFeatures();
+        // Re-render working set to show updated status
+        apiCall('/api/features').then(featureSet => {
+            renderWorkingSetForCategory(featureSet.features);
+        });
+    }
+
+    function updateCategoryFeatureStrength(index, strength) {
+        editingCategoryFeatures[index].strength = parseFloat(strength);
+    }
+
+    async function addCategoryFeatureToWorkingSet(index) {
+        const f = editingCategoryFeatures[index];
+        const model = document.getElementById('model-select').value;
+
+        try {
+            const result = await apiCall('/api/features/add', 'POST', {
+                modelId: model,
+                layer: f.layer,
+                index: f.index,
+                strength: f.strength || 5,
+                description: f.description || ''
+            });
+
+            if (result.error) {
+                alert(result.error);
+            } else {
+                // Update the working set features and re-render
+                currentWorkingSetFeatures = result.feature_set.features;
+                renderCategoryFeatures();
+                renderWorkingSetForCategory(result.feature_set.features);
+            }
+        } catch (error) {
+            alert('Error adding feature to working set: ' + error.message);
+        }
+    }
+
+    async function saveCategoryChanges() {
+        const name = document.getElementById('edit-category-name').value.trim();
+        const color = document.getElementById('edit-category-color').value;
+
+        if (!name) {
+            alert('Please enter a category name');
+            return;
+        }
+
+        try {
+            await apiCall(`/api/feature-categories/${editingCategoryId}`, 'PUT', {
+                name,
+                color,
+                features: editingCategoryFeatures
+            });
+            location.reload();
+        } catch (error) {
+            alert('Error saving category: ' + error.message);
+        }
+    }
+
+    // Close modals on click outside
+    document.getElementById('create-category-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            hideCreateCategory();
+        }
+    });
+
+    document.getElementById('edit-category-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            hideEditCategory();
+        }
+    });
 </script>
 {% endblock %}

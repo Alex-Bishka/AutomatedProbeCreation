@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+
+{% block title %}Review Queue - SAE Steering{% endblock %}
+
+{% block content %}
+<h2>Human Review Queue</h2>
+
+<p>Review steering results where the automated judge was uncertain. Your verdicts help improve probe quality.</p>
+
+<!-- Stats Section -->
+<div class="stats-bar">
+    <div class="stat">
+        <span class="stat-value">{{ pending|length }}</span>
+        <span class="stat-label">Pending</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{ reviewed|length }}</span>
+        <span class="stat-label">Reviewed</span>
+    </div>
+</div>
+
+<!-- Pending Items -->
+{% if pending %}
+<div class="section">
+    <h3>Pending Review ({{ pending|length }})</h3>
+
+    {% for item in pending %}
+    <div class="review-item" id="item-{{ item.id }}">
+        <div class="review-header">
+            <h4>{{ item.scenario.name if item.scenario.name else 'Unnamed Scenario' }}</h4>
+            <span class="text-muted text-small">{{ item.created_at[:19] }}</span>
+        </div>
+
+        <!-- Scenario Context -->
+        <div class="scenario-context">
+            <strong>Scenario:</strong>
+            <div class="messages-preview">
+                {% for msg in item.scenario.messages[:3] %}
+                <div class="message-preview {{ msg.role }}">
+                    <span class="role-badge">{{ msg.role }}</span>
+                    {{ msg.content[:200] }}{% if msg.content|length > 200 %}...{% endif %}
+                </div>
+                {% endfor %}
+                {% if item.scenario.messages|length > 3 %}
+                <div class="text-muted text-small">+ {{ item.scenario.messages|length - 3 }} more messages</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Response Comparison -->
+        <div class="response-comparison">
+            <div class="response-col">
+                <h5>Default Response</h5>
+                <div class="response-content">
+                    {{ item.default_response[:500] if item.default_response else '(empty)' }}{% if item.default_response and item.default_response|length > 500 %}...{% endif %}
+                </div>
+            </div>
+            <div class="response-col">
+                <h5>Steered Response</h5>
+                <div class="response-content">
+                    {{ item.steered_response[:500] if item.steered_response else '(empty)' }}{% if item.steered_response and item.steered_response|length > 500 %}...{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Judge's Evaluation -->
+        {% if item.judge_evaluation %}
+        {% set first_strength = item.judge_evaluation.strength_evaluations.keys()|list|first if item.judge_evaluation.strength_evaluations else none %}
+        {% set first_eval = item.judge_evaluation.strength_evaluations[first_strength].evaluations[0].evaluation if first_strength and item.judge_evaluation.strength_evaluations[first_strength].evaluations else none %}
+        <div class="judge-eval">
+            <strong>Judge Evaluation:</strong>
+            {% if first_eval %}
+            <span class="eval-badge eval-{{ first_eval.classification }}">
+                {{ first_eval.classification }}
+            </span>
+            (Confidence: {{ (first_eval.confidence * 100)|round(1) }}%)
+            {% if first_eval.review_reason %}
+            <div class="review-reason">Reason: {{ first_eval.review_reason }}</div>
+            {% endif %}
+            {% else %}
+            <span class="text-muted">No evaluation data</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Features Applied -->
+        <div class="features-applied">
+            <strong>Features Applied:</strong>
+            {% for f in item.features[:3] %}
+            <code>L{{ f.layer.split('-')[0] if f.layer else '?' }}:{{ f.index }} ({{ f.strength }})</code>
+            {% endfor %}
+            {% if item.features|length > 3 %}
+            <span class="text-muted">+ {{ item.features|length - 3 }} more</span>
+            {% endif %}
+        </div>
+
+        <!-- Verdict Actions -->
+        <div class="verdict-actions">
+            <button class="btn success" onclick="submitVerdict('{{ item.id }}', 'success')">
+                Mark as Success
+            </button>
+            <button class="btn danger" onclick="submitVerdict('{{ item.id }}', 'failure')">
+                Mark as Failure
+            </button>
+            <button class="btn" onclick="submitVerdict('{{ item.id }}', 'exclude')">
+                Exclude from Training
+            </button>
+        </div>
+
+        <div class="notes-section">
+            <label>Notes (optional):</label>
+            <textarea id="notes-{{ item.id }}" placeholder="Add any notes about this review..."></textarea>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted mt-2">No items pending review. Run the pipeline to generate more scenarios.</p>
+{% endif %}
+
+<!-- Reviewed Items (Collapsed) -->
+{% if reviewed %}
+<div class="section mt-2">
+    <h3 class="collapsible" onclick="toggleCollapsible(this)">
+        Reviewed Items ({{ reviewed|length }})
+    </h3>
+    <div class="collapsible-content">
+        <table>
+            <thead>
+                <tr>
+                    <th>Scenario</th>
+                    <th>Verdict</th>
+                    <th>Reviewed At</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in reviewed %}
+                <tr>
+                    <td>{{ item.scenario.name if item.scenario.name else 'Unnamed' }}</td>
+                    <td>
+                        <span class="verdict-badge verdict-{{ item.human_verdict }}">
+                            {{ item.human_verdict }}
+                        </span>
+                    </td>
+                    <td>{{ item.reviewed_at[:19] if item.reviewed_at else '-' }}</td>
+                    <td>{{ item.notes[:50] if item.notes else '-' }}{% if item.notes and item.notes|length > 50 %}...{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function submitVerdict(itemId, verdict) {
+    const notes = document.getElementById(`notes-${itemId}`).value;
+
+    try {
+        const response = await fetch(`/api/pipeline/review-queue/${itemId}/verdict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ verdict, notes })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Remove the item from the page
+            const item = document.getElementById(`item-${itemId}`);
+            item.style.opacity = '0.5';
+            item.innerHTML = `<div class="review-completed">Marked as <strong>${verdict}</strong>. <a href="/review">Refresh</a> to update.</div>`;
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error submitting verdict: ' + error.message);
+    }
+}
+</script>
+
+<style>
+.stats-bar {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.stat {
+    background: #f5f5f5;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    display: block;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.review-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.review-header h4 {
+    margin: 0;
+}
+
+.scenario-context {
+    background: #f9fafb;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.messages-preview {
+    margin-top: 0.5rem;
+}
+
+.message-preview {
+    padding: 0.5rem;
+    margin: 0.25rem 0;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.message-preview.system {
+    background: #e0e7ff;
+}
+
+.message-preview.user {
+    background: #dbeafe;
+}
+
+.message-preview.assistant {
+    background: #d1fae5;
+}
+
+.role-badge {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    margin-right: 0.5rem;
+}
+
+.response-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.response-col h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.response-content {
+    background: #f5f5f5;
+    padding: 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    min-height: 100px;
+    white-space: pre-wrap;
+}
+
+.judge-eval {
+    background: #fef3c7;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.eval-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.eval-success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.eval-partial {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.eval-failure {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.eval-inconclusive {
+    background: #e5e7eb;
+    color: #4b5563;
+}
+
+.review-reason {
+    margin-top: 0.5rem;
+    font-style: italic;
+    color: #666;
+}
+
+.features-applied {
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.features-applied code {
+    background: #e0e7ff;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    margin-right: 0.5rem;
+}
+
+.verdict-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.verdict-actions .btn.success {
+    background: #10b981;
+    color: white;
+}
+
+.verdict-actions .btn.success:hover {
+    background: #059669;
+}
+
+.notes-section label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.notes-section textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-height: 60px;
+    resize: vertical;
+}
+
+.review-completed {
+    padding: 1rem;
+    background: #d1fae5;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.verdict-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.verdict-success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.verdict-failure {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.verdict-exclude {
+    background: #e5e7eb;
+    color: #4b5563;
+}
+
+.collapsible-content {
+    display: none;
+    padding-top: 1rem;
+}
+
+.collapsible-content.show {
+    display: block;
+}
+
+.collapsible::after {
+    content: ' >';
+}
+
+.collapsible.expanded::after {
+    content: ' v';
+}
+
+.mt-2 {
+    margin-top: 2rem;
+}
+</style>
+{% endblock %}

@@ -64,24 +64,23 @@
 <!-- Scenarios grouped by category -->
 <div id="scenarios-list">
     <!-- Uncategorized scenarios first -->
-    {% set uncategorized = scenarios | selectattr('category', 'undefined') | list + scenarios | selectattr('category', 'none') | list + scenarios | selectattr('category', 'equalto', '') | list %}
     {% if uncategorized %}
     <div class="category-group" data-category="">
-        <h3 class="category-header collapsible expanded" onclick="toggleCategoryGroup(this)">
+        <h3 class="category-header collapsible" onclick="toggleCategoryGroup(this)">
             <span class="category-color" style="background: #888;"></span>
             Uncategorized
             <span class="text-muted text-small">({{ uncategorized | length }})</span>
         </h3>
-        <div class="category-content show">
+        <div class="category-content">
             {% for scenario in uncategorized %}
             <div class="card scenario-card" id="scenario-{{ scenario.id }}" data-category="">
                 <div class="card-header">
                     <h3 class="card-title collapsible" onclick="toggleScenario(this)">{{ scenario.name }}</h3>
                     <div class="card-actions">
                         <select class="category-select" onchange="assignCategory('{{ scenario.id }}', this.value)" style="width: auto; margin: 0; padding: 0.2rem;">
-                            <option value="">No category</option>
+                            <option value="" selected>No category</option>
                             {% for cat in categories %}
-                            <option value="{{ cat.id }}" {% if scenario.category == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
                             {% endfor %}
                         </select>
                         <button class="btn small" onclick="editScenario('{{ scenario.id }}')">Edit</button>
@@ -106,15 +105,15 @@
 
     <!-- Categorized scenarios -->
     {% for cat in categories %}
-    {% set cat_scenarios = scenarios | selectattr('category', 'equalto', cat.id) | list %}
+    {% set cat_scenarios = categorized.get(cat.id, []) %}
     {% if cat_scenarios %}
     <div class="category-group" data-category="{{ cat.id }}">
-        <h3 class="category-header collapsible expanded" onclick="toggleCategoryGroup(this)" style="border-left: 4px solid {{ cat.color }}; padding-left: 0.5rem;">
+        <h3 class="category-header collapsible" onclick="toggleCategoryGroup(this)" style="border-left: 4px solid {{ cat.color }}; padding-left: 0.5rem;">
             <span class="category-color" style="background: {{ cat.color }};"></span>
             {{ cat.name }}
             <span class="text-muted text-small">({{ cat_scenarios | length }})</span>
         </h3>
-        <div class="category-content show">
+        <div class="category-content">
             {% for scenario in cat_scenarios %}
             <div class="card scenario-card" id="scenario-{{ scenario.id }}" data-category="{{ cat.id }}" style="border-left: 3px solid {{ cat.color }};">
                 <div class="card-header">
@@ -123,7 +122,7 @@
                         <select class="category-select" onchange="assignCategory('{{ scenario.id }}', this.value)" style="width: auto; margin: 0; padding: 0.2rem;">
                             <option value="">No category</option>
                             {% for c in categories %}
-                            <option value="{{ c.id }}" {% if scenario.category == c.id %}selected{% endif %}>{{ c.name }}</option>
+                            <option value="{{ c.id }}" {% if c.id == cat.id %}selected{% endif %}>{{ c.name }}</option>
                             {% endfor %}
                         </select>
                         <button class="btn small" onclick="editScenario('{{ scenario.id }}')">Edit</button>
@@ -225,6 +224,7 @@
     async function updateCategory(id, name) {
         try {
             await apiCall(`/api/categories/${id}`, 'PUT', { name });
+            location.reload();
         } catch (error) {
             alert('Error updating category: ' + error.message);
         }

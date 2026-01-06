@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Probe Management - SAE Steering{% endblock %}
+
+{% block content %}
+<h2>Probe Management</h2>
+
+<p>Create and manage deception detection probes trained on successful steering examples.</p>
+
+<!-- Create Probe Section -->
+<div class="section">
+    <h3>Create New Probe</h3>
+
+    <div class="create-probe-form">
+        <div class="form-group">
+            <label>Training Data Source</label>
+            <p class="text-muted text-small">Probes are trained on successful deception examples from the review queue and benign examples as negatives.</p>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="positive-count">-</div>
+                <div class="stat-label">Positive Examples (Deceptive)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="benign-count">-</div>
+                <div class="stat-label">Negative Examples (Benign)</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="probe-name">Probe Name</label>
+            <input type="text" id="probe-name" placeholder="e.g., deception_probe_v1">
+        </div>
+
+        <div class="form-group">
+            <label for="test-split">Test Split Ratio</label>
+            <input type="number" id="test-split" value="0.2" min="0.1" max="0.5" step="0.1">
+            <span class="text-muted text-small">Fraction of data to use for evaluation</span>
+        </div>
+
+        <button class="btn primary" onclick="createProbe()" disabled id="create-probe-btn">
+            Create Probe (Coming Soon)
+        </button>
+    </div>
+</div>
+
+<!-- Trained Probes Section -->
+<div class="section mt-2">
+    <h3>Trained Probes</h3>
+
+    {% if probes %}
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Training Size</th>
+                <th>AUC Score</th>
+                <th>Accuracy</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for probe in probes %}
+            <tr>
+                <td><strong>{{ probe.name }}</strong></td>
+                <td>{{ probe.created_at[:19] }}</td>
+                <td>{{ probe.training_size }} examples</td>
+                <td>{{ (probe.auc * 100)|round(1) }}%</td>
+                <td>{{ (probe.accuracy * 100)|round(1) }}%</td>
+                <td>
+                    <button class="btn small" onclick="viewProbe('{{ probe.id }}')">View</button>
+                    <button class="btn small" onclick="evaluateProbe('{{ probe.id }}')">Evaluate</button>
+                    <button class="btn small danger" onclick="deleteProbe('{{ probe.id }}')">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p class="text-muted">No probes trained yet.</p>
+        <p class="text-small">
+            Probes are created from successful deception examples identified through the pipeline.
+            First, run the pipeline and review the results to collect training data.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Probe Details Modal (placeholder) -->
+<div id="probe-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>Probe Details</h3>
+        <div id="probe-modal-content"></div>
+        <button class="btn" onclick="closeModal()">Close</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load stats on page load
+document.addEventListener('DOMContentLoaded', loadStats);
+
+async function loadStats() {
+    try {
+        // Get review queue stats
+        const reviewResponse = await fetch('/api/pipeline/review-queue/stats');
+        const reviewStats = await reviewResponse.json();
+
+        // Count successful reviews as positive examples
+        const positives = reviewStats.verdicts?.success || 0;
+        document.getElementById('positive-count').textContent = positives;
+
+        // TODO: Get benign prompts count
+        document.getElementById('benign-count').textContent = '~1.3M';
+
+        // Enable create button if we have enough positives
+        if (positives >= 5) {
+            // Note: Button is still disabled as probe creation is not implemented
+            // document.getElementById('create-probe-btn').disabled = false;
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+function createProbe() {
+    alert('Probe creation is not yet implemented. Coming soon!');
+}
+
+function viewProbe(probeId) {
+    alert('Probe viewing is not yet implemented.');
+}
+
+function evaluateProbe(probeId) {
+    alert('Probe evaluation is not yet implemented.');
+}
+
+function deleteProbe(probeId) {
+    if (confirm('Are you sure you want to delete this probe?')) {
+        alert('Probe deletion is not yet implemented.');
+    }
+}
+
+function closeModal() {
+    document.getElementById('probe-modal').style.display = 'none';
+}
+</script>
+
+<style>
+.create-probe-form {
+    max-width: 600px;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    width: 100%;
+    max-width: 300px;
+}
+
+.stats-row {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: #f5f5f5;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+    min-width: 150px;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #1a1a2e;
+}
+
+.stat-card .stat-label {
+    color: #666;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.text-small {
+    font-size: 0.85rem;
+}
+
+.text-muted {
+    color: #666;
+}
+
+.mt-2 {
+    margin-top: 2rem;
+}
+</style>
+{% endblock %}

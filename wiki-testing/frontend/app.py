@@ -70,8 +70,10 @@ BASE_DIR = Path(__file__).parent
 SCENARIOS_FILE = BASE_DIR / "scenarios.json"
 FEATURE_SET_FILE = BASE_DIR / "feature_set.json"
 ARCHIVED_FEATURES_FILE = BASE_DIR / "archived_features.json"
+FEATURE_CATEGORIES_FILE = BASE_DIR / "feature_categories.json"
 CATEGORIES_FILE = BASE_DIR / "categories.json"
 STARRED_RUNS_FILE = BASE_DIR / "starred_runs.json"
+INVALID_RUNS_FILE = BASE_DIR / "invalid_runs.json"
 RUNS_DIR = BASE_DIR.parent / "runs"
 
 # Default category colors
@@ -123,6 +125,28 @@ def save_archived_features(features):
         json.dump(features, f, indent=2)
 
 
+def load_feature_categories():
+    if FEATURE_CATEGORIES_FILE.exists():
+        with open(FEATURE_CATEGORIES_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+
+def save_feature_categories(categories):
+    with open(FEATURE_CATEGORIES_FILE, "w") as f:
+        json.dump(categories, f, indent=2)
+
+
+def get_next_feature_category_color():
+    """Get the next color for a new feature category."""
+    categories = load_feature_categories()
+    used_colors = {c.get("color") for c in categories}
+    for color in DEFAULT_COLORS:
+        if color not in used_colors:
+            return color
+    return DEFAULT_COLORS[len(categories) % len(DEFAULT_COLORS)]
+
+
 def load_categories():
     if CATEGORIES_FILE.exists():
         with open(CATEGORIES_FILE, "r") as f:
@@ -160,16 +184,32 @@ def save_starred_runs(starred):
         json.dump(list(starred), f, indent=2)
 
 
+def load_invalid_runs():
+    """Load the set of invalid run filenames."""
+    if INVALID_RUNS_FILE.exists():
+        with open(INVALID_RUNS_FILE, "r") as f:
+            return set(json.load(f))
+    return set()
+
+
+def save_invalid_runs(invalid):
+    """Save the set of invalid run filenames."""
+    with open(INVALID_RUNS_FILE, "w") as f:
+        json.dump(list(invalid), f, indent=2)
+
+
 def load_runs():
     """Load all past runs from the runs directory."""
     runs = []
     starred = load_starred_runs()
+    invalid = load_invalid_runs()
     if RUNS_DIR.exists():
         for run_file in sorted(RUNS_DIR.glob("*.json"), reverse=True):
             with open(run_file, "r") as f:
                 run_data = json.load(f)
                 run_data["filename"] = run_file.name
                 run_data["starred"] = run_file.name in starred
+                run_data["invalid"] = run_file.name in invalid
 
                 # Calculate score from votes (good=1, neutral=0.5, bad=0)
                 results = run_data.get("results", [])
@@ -182,7 +222,7 @@ def load_runs():
                 # Score is weighted average (good=1, neutral=0.5, bad=0)
                 if voted > 0:
                     run_data["score"] = (good_votes + neutral_votes * 0.5) / total
-                    run_data["score_display"] = f"{good_votes}+{neutral_votes}~/{total}"
+                    run_data["score_display"] = f"{good_votes}g {neutral_votes}n {bad_votes}b"
                 else:
                     run_data["score"] = None  # No votes yet
                     run_data["score_display"] = "—"
@@ -288,7 +328,17 @@ def features_page():
     """Feature search and selection page."""
     feature_set = load_feature_set()
     archived = load_archived_features()
-    return render_template("features.html", feature_set=feature_set, archived=archived)
+    feature_categories = load_feature_categories()
+
+    # Separate active and archived feature categories
+    active_categories = [c for c in feature_categories if not c.get("archived", False)]
+    archived_categories = [c for c in feature_categories if c.get("archived", False)]
+
+    return render_template("features.html",
+                          feature_set=feature_set,
+                          archived=archived,
+                          feature_categories=active_categories,
+                          archived_feature_categories=archived_categories)
 
 
 @app.route("/api/features/search", methods=["POST"])
@@ -334,7 +384,7 @@ def api_add_feature():
         "modelId": data.get("modelId", feature_set["model"]),
         "layer": new_layer,
         "index": new_index,
-        "strength": data.get("strength", 10),
+        "strength": data.get("strength", 5),
         "description": data.get("description", ""),
         "enabled": True
     }
@@ -498,7 +548,219 @@ def api_get_archived():
     return jsonify(load_archived_features())
 
 
-# ============== CATEGORIES ==============
+# ============== FEATURE CATEGORIES ==============
+
+@app.route("/api/feature-categories", methods=["GET"])
+def api_get_feature_categories():
+    """Get all feature categories."""
+    return jsonify(load_feature_categories())
+
+
+@app.route("/api/feature-categories", methods=["POST"])
+def api_add_feature_category():
+    """Create a new feature category."""
+    data = request.json
+    categories = load_feature_categories()
+
+    new_category = {
+        "id": f"fcat_{len(categories) + 1}_{int(datetime.now().timestamp())}",
+        "name": data.get("name", "New Category"),
+        "color": data.get("color", get_next_feature_category_color()),
+        "features": data.get("features", []),
+        "archived": False
+    }
+
+    categories.append(new_category)
+    save_feature_categories(categories)
+    return jsonify({"success": True, "category": new_category, "categories": categories})
+
+
+@app.route("/api/feature-categories/<category_id>", methods=["GET"])
+def api_get_feature_category(category_id):
+    """Get a specific feature category."""
+    categories = load_feature_categories()
+    for c in categories:
+        if c["id"] == category_id:
+            return jsonify(c)
+    return jsonify({"error": "Category not found"}), 404
+
+
+@app.route("/api/feature-categories/<category_id>", methods=["PUT"])
+def api_update_feature_category(category_id):
+    """Update a feature category."""
+    data = request.json
+    categories = load_feature_categories()
+
+    for i, c in enumerate(categories):
+        if c["id"] == category_id:
+            # Update fields but preserve id and features if not provided
+            categories[i] = {
+                "id": c["id"],
+                "name": data.get("name", c.get("name")),
+                "color": data.get("color", c.get("color")),
+                "features": data.get("features", c.get("features", [])),
+                "archived": data.get("archived", c.get("archived", False))
+            }
+            save_feature_categories(categories)
+            return jsonify({"success": True, "category": categories[i], "categories": categories})
+
+    return jsonify({"error": "Category not found"}), 404
+
+
+@app.route("/api/feature-categories/<category_id>", methods=["DELETE"])
+def api_delete_feature_category(category_id):
+    """Delete a feature category."""
+    categories = load_feature_categories()
+    categories = [c for c in categories if c["id"] != category_id]
+    save_feature_categories(categories)
+    return jsonify({"success": True, "categories": categories})
+
+
+@app.route("/api/feature-categories/<category_id>/add-feature", methods=["POST"])
+def api_add_feature_to_category(category_id):
+    """Add a feature to a category."""
+    data = request.json
+    categories = load_feature_categories()
+
+    for i, c in enumerate(categories):
+        if c["id"] == category_id:
+            new_feature = {
+                "layer": data.get("layer"),
+                "index": int(data.get("index")),
+                "strength": data.get("strength", 5),
+                "description": data.get("description", "")
+            }
+
+            # Check if feature already exists in category
+            for f in c.get("features", []):
+                if f["layer"] == new_feature["layer"] and str(f["index"]) == str(new_feature["index"]):
+                    return jsonify({"error": "Feature already in category"}), 400
+
+            if "features" not in categories[i]:
+                categories[i]["features"] = []
+            categories[i]["features"].append(new_feature)
+            save_feature_categories(categories)
+            return jsonify({"success": True, "category": categories[i]})
+
+    return jsonify({"error": "Category not found"}), 404
+
+
+@app.route("/api/feature-categories/<category_id>/remove-feature", methods=["POST"])
+def api_remove_feature_from_category(category_id):
+    """Remove a feature from a category."""
+    data = request.json
+    categories = load_feature_categories()
+
+    layer = data.get("layer")
+    index = str(data.get("index"))
+
+    for i, c in enumerate(categories):
+        if c["id"] == category_id:
+            categories[i]["features"] = [
+                f for f in c.get("features", [])
+                if not (f["layer"] == layer and str(f["index"]) == index)
+            ]
+            save_feature_categories(categories)
+            return jsonify({"success": True, "category": categories[i]})
+
+    return jsonify({"error": "Category not found"}), 404
+
+
+@app.route("/api/feature-categories/<category_id>/activate", methods=["POST"])
+def api_activate_feature_category(category_id):
+    """Add all features from a category to the working set."""
+    categories = load_feature_categories()
+    feature_set = load_feature_set()
+
+    category = None
+    for c in categories:
+        if c["id"] == category_id:
+            category = c
+            break
+
+    if not category:
+        return jsonify({"error": "Category not found"}), 404
+
+    added_count = 0
+    for cat_feature in category.get("features", []):
+        # Check if feature already exists in working set
+        already_exists = any(
+            f["layer"] == cat_feature["layer"] and str(f["index"]) == str(cat_feature["index"])
+            for f in feature_set["features"]
+        )
+
+        if not already_exists:
+            new_feature = {
+                "modelId": feature_set.get("model", "llama3.1-8b-it"),
+                "layer": cat_feature["layer"],
+                "index": int(cat_feature["index"]),
+                "strength": cat_feature.get("strength", 5),
+                "description": cat_feature.get("description", ""),
+                "enabled": True
+            }
+            feature_set["features"].append(new_feature)
+            added_count += 1
+
+    save_feature_set(feature_set)
+    return jsonify({
+        "success": True,
+        "added_count": added_count,
+        "feature_set": feature_set
+    })
+
+
+@app.route("/api/feature-categories/<category_id>/deactivate", methods=["POST"])
+def api_deactivate_feature_category(category_id):
+    """Remove all features from a category from the working set."""
+    categories = load_feature_categories()
+    feature_set = load_feature_set()
+
+    category = None
+    for c in categories:
+        if c["id"] == category_id:
+            category = c
+            break
+
+    if not category:
+        return jsonify({"error": "Category not found"}), 404
+
+    # Get set of features to remove (by layer+index)
+    features_to_remove = {
+        (f["layer"], str(f["index"]))
+        for f in category.get("features", [])
+    }
+
+    initial_count = len(feature_set["features"])
+    feature_set["features"] = [
+        f for f in feature_set["features"]
+        if (f["layer"], str(f["index"])) not in features_to_remove
+    ]
+    removed_count = initial_count - len(feature_set["features"])
+
+    save_feature_set(feature_set)
+    return jsonify({
+        "success": True,
+        "removed_count": removed_count,
+        "feature_set": feature_set
+    })
+
+
+@app.route("/api/feature-categories/<category_id>/archive", methods=["POST"])
+def api_archive_feature_category(category_id):
+    """Toggle archive status for a feature category."""
+    data = request.json
+    categories = load_feature_categories()
+
+    for i, c in enumerate(categories):
+        if c["id"] == category_id:
+            categories[i]["archived"] = data.get("archived", not c.get("archived", False))
+            save_feature_categories(categories)
+            return jsonify({"success": True, "category": categories[i], "categories": categories})
+
+    return jsonify({"error": "Category not found"}), 404
+
+
+# ============== SCENARIO CATEGORIES ==============
 
 @app.route("/api/categories", methods=["GET"])
 def api_get_categories():
@@ -560,7 +822,21 @@ def scenarios_page():
     """Scenarios viewing and editing page."""
     scenarios = load_scenarios()
     categories = load_categories()
-    return render_template("scenarios.html", scenarios=scenarios, categories=categories)
+
+    # Separate uncategorized scenarios (category is None, empty, or missing)
+    category_ids = {c["id"] for c in categories}
+    uncategorized = [s for s in scenarios if not s.get("category") or s.get("category") not in category_ids]
+
+    # Group scenarios by category
+    categorized = {}
+    for cat in categories:
+        categorized[cat["id"]] = [s for s in scenarios if s.get("category") == cat["id"]]
+
+    return render_template("scenarios.html",
+                          scenarios=scenarios,
+                          categories=categories,
+                          uncategorized=uncategorized,
+                          categorized=categorized)
 
 
 @app.route("/api/scenarios", methods=["GET"])
@@ -700,11 +976,18 @@ def api_run_scenarios():
 @app.route("/runs")
 def runs_page():
     """Browse past runs page."""
-    runs = load_runs()
+    all_runs = load_runs()
     categories = load_categories()
     # Create a lookup dict for categories
     cat_lookup = {c["id"]: c for c in categories}
-    return render_template("runs.html", runs=runs, categories=categories, cat_lookup=cat_lookup)
+    # Separate valid and invalid runs
+    valid_runs = [r for r in all_runs if not r.get("invalid", False)]
+    invalid_runs = [r for r in all_runs if r.get("invalid", False)]
+    return render_template("runs.html",
+                          runs=valid_runs,
+                          invalid_runs=invalid_runs,
+                          categories=categories,
+                          cat_lookup=cat_lookup)
 
 
 @app.route("/api/runs", methods=["GET"])
@@ -739,6 +1022,24 @@ def api_toggle_star():
 
     save_starred_runs(starred_runs)
     return jsonify({"success": True, "starred": starred})
+
+
+@app.route("/api/runs/invalid", methods=["POST"])
+def api_toggle_invalid():
+    """Toggle invalid state for a run."""
+    data = request.json
+    filename = data.get("filename")
+    invalid = data.get("invalid", True)
+
+    invalid_runs = load_invalid_runs()
+
+    if invalid:
+        invalid_runs.add(filename)
+    else:
+        invalid_runs.discard(filename)
+
+    save_invalid_runs(invalid_runs)
+    return jsonify({"success": True, "invalid": invalid})
 
 
 @app.route("/runs/<filename>")
@@ -808,6 +1109,414 @@ def api_vote_scenario(filename):
         "bad_votes": bad_votes,
         "total": total
     })
+
+
+# =============================================================================
+# PIPELINE ROUTES (Self-contained, separate from manual process)
+# =============================================================================
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from pipeline import (
+    PipelineOrchestrator,
+    load_pipeline_scenarios,
+    load_pipeline_jobs,
+    load_review_queue,
+    save_review_queue,
+    get_job_status,
+    cancel_job,
+    list_jobs,
+    load_job_details
+)
+from agents import (
+    ScenarioCreatorAgent,
+    ScenarioQualityJudge,
+    FeatureSelectorAgent,
+    EvaluationJudgeAgent,
+    get_agent,
+    VETTED_CATEGORIES,
+    load_pipeline_config,
+    save_pipeline_config,
+    get_agent_info
+)
+
+# Pipeline page routes
+@app.route("/pipeline")
+def pipeline_page():
+    """Pipeline configuration and launch page."""
+    jobs = list_jobs(limit=10)
+    return render_template("pipeline.html", jobs=jobs)
+
+
+@app.route("/pipeline/job/<job_id>")
+def job_detail_page(job_id):
+    """View detailed results of a pipeline job."""
+    job = load_job_details(job_id)
+    if not job:
+        # Try loading from jobs list for basic info
+        job_status = get_job_status(job_id)
+        if job_status:
+            job = {"job_id": job_id, "error": "Detailed results not available", **job_status}
+        else:
+            job = None
+    return render_template("job_detail.html", job=job)
+
+
+@app.route("/config")
+def config_page():
+    """Pipeline configuration page."""
+    config = load_pipeline_config()
+    agents = get_agent_info()
+    return render_template("config.html", config=config, agents=agents)
+
+
+@app.route("/api/config", methods=["GET"])
+def api_get_config():
+    """Get pipeline configuration."""
+    return jsonify(load_pipeline_config())
+
+
+@app.route("/api/config", methods=["POST"])
+def api_save_config():
+    """Save pipeline configuration."""
+    config = request.json
+    try:
+        save_pipeline_config(config)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/config/reset", methods=["POST"])
+def api_reset_config():
+    """Reset pipeline configuration to defaults."""
+    default_config = {
+        "models": {
+            "default": "google/gemini-2.5-flash",
+            "high_quality": "google/gemini-2.5-pro"
+        },
+        "pipeline_defaults": {
+            "num_scenarios": 10,
+            "max_features_per_concept": 3,
+            "topk_search_results": 20,
+            "min_success_for_probe": 5
+        },
+        "steering_params": {
+            "temperature": 0.8,
+            "n_tokens": 128,
+            "freq_penalty": 1,
+            "seed": 16,
+            "strength_multiplier": 1,
+            "steer_method": "SIMPLE_ADDITIVE"
+        },
+        "vetted_categories": [
+            {"id": "cat_1_1767124090", "name": "Fear/Survival Deception Scenarios - GDM style"},
+            {"id": "cat_3_1767125787", "name": "Corporate Loyalty - GDM style"}
+        ],
+        "agent_prompt_overrides": {}
+    }
+    try:
+        save_pipeline_config(default_config)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/review")
+def review_page():
+    """Human review queue page."""
+    queue = load_review_queue()
+    pending = [item for item in queue if item.get("status") == "pending"]
+    reviewed = [item for item in queue if item.get("status") == "reviewed"]
+    return render_template("review.html", pending=pending, reviewed=reviewed)
+
+
+@app.route("/probes")
+def probes_page():
+    """Probe management page."""
+    # TODO: Load trained probes
+    probes = []
+    return render_template("probes.html", probes=probes)
+
+
+# Pipeline API routes
+@app.route("/api/pipeline/start", methods=["POST"])
+def api_pipeline_start():
+    """Start a new pipeline run."""
+    data = request.json or {}
+
+    num_scenarios = data.get("num_scenarios", 10)
+    target_model = data.get("target_model", "llama3.1-8b-it")
+    high_quality_mode = data.get("high_quality_mode", False)
+    max_features_per_concept = data.get("max_features_per_concept", 3)
+
+    try:
+        orchestrator = PipelineOrchestrator(high_quality_mode=high_quality_mode)
+
+        # Run pipeline (this is synchronous for now)
+        # TODO: Make this async with background task
+        results = orchestrator.run(
+            num_scenarios=num_scenarios,
+            target_model=target_model,
+            max_features_per_concept=max_features_per_concept
+        )
+
+        return jsonify({
+            "success": True,
+            "job_id": results["job_id"],
+            "results": {
+                "templates_used": results["templates_used"],
+                "scenarios_generated": results["scenarios_generated"],
+                "scenarios_approved": results["scenarios_approved"],
+                "concepts": results["concepts_extracted"],
+                "features_count": len(results["features_selected"]),
+                "successes": results["successes"],
+                "failures": results["failures"],
+                "review_items": results["review_queue_items"]
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/pipeline/status/<job_id>")
+def api_pipeline_status(job_id):
+    """Get the status of a pipeline job."""
+    job = get_job_status(job_id)
+    if job:
+        return jsonify(job)
+    return jsonify({"error": "Job not found"}), 404
+
+
+@app.route("/api/pipeline/cancel/<job_id>", methods=["POST"])
+def api_pipeline_cancel(job_id):
+    """Cancel a running pipeline job."""
+    if cancel_job(job_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "Job not found or not running"}), 400
+
+
+@app.route("/api/pipeline/jobs")
+def api_pipeline_jobs():
+    """List all pipeline jobs."""
+    limit = request.args.get("limit", 20, type=int)
+    jobs = list_jobs(limit=limit)
+    return jsonify(jobs)
+
+
+@app.route("/api/pipeline/jobs/<job_id>", methods=["DELETE"])
+def api_delete_pipeline_job(job_id):
+    """Delete a pipeline job and its details."""
+    from pipeline import load_pipeline_jobs, save_pipeline_jobs, JOB_DETAILS_DIR
+
+    jobs = load_pipeline_jobs()
+    original_count = len(jobs)
+    jobs = [j for j in jobs if j["id"] != job_id]
+
+    if len(jobs) == original_count:
+        return jsonify({"error": "Job not found"}), 404
+
+    save_pipeline_jobs(jobs)
+
+    # Also delete job details file if it exists
+    details_file = JOB_DETAILS_DIR / f"{job_id}.json"
+    if details_file.exists():
+        details_file.unlink()
+
+    return jsonify({"success": True})
+
+
+# Agent-specific routes
+@app.route("/api/pipeline/agents/scenario-creator/generate", methods=["POST"])
+def api_scenario_creator_generate():
+    """Generate scenarios using the ScenarioCreatorAgent."""
+    data = request.json or {}
+
+    num_scenarios = data.get("num_scenarios", 5)
+    high_quality_mode = data.get("high_quality_mode", False)
+
+    # Load vetted templates
+    scenarios = load_scenarios()
+    templates = [s for s in scenarios if s.get("category") in VETTED_CATEGORIES]
+
+    if not templates:
+        return jsonify({"error": "No vetted template scenarios found"}), 400
+
+    agent = get_agent(ScenarioCreatorAgent, high_quality_mode)
+    generated = agent.generate(templates, num_scenarios)
+
+    return jsonify({
+        "success": True,
+        "templates_used": len(templates),
+        "scenarios_generated": len(generated),
+        "scenarios": generated
+    })
+
+
+@app.route("/api/pipeline/agents/quality-judge/evaluate", methods=["POST"])
+def api_quality_judge_evaluate():
+    """Evaluate scenarios using the ScenarioQualityJudge."""
+    data = request.json or {}
+
+    generated_scenarios = data.get("scenarios", [])
+    high_quality_mode = data.get("high_quality_mode", False)
+
+    if not generated_scenarios:
+        return jsonify({"error": "No scenarios to evaluate"}), 400
+
+    # Load vetted templates
+    scenarios = load_scenarios()
+    templates = [s for s in scenarios if s.get("category") in VETTED_CATEGORIES]
+
+    agent = get_agent(ScenarioQualityJudge, high_quality_mode)
+    result = agent.evaluate(generated_scenarios, templates)
+
+    return jsonify({
+        "success": True,
+        "approved": result.get("approved", []),
+        "rejected": result.get("rejected", []),
+        "extracted_concepts": result.get("extracted_concepts", [])
+    })
+
+
+@app.route("/api/pipeline/agents/feature-selector/search", methods=["POST"])
+def api_feature_selector_search():
+    """Search and select features using the FeatureSelectorAgent."""
+    data = request.json or {}
+
+    concepts = data.get("concepts", [])
+    target_model = data.get("model", "llama3.1-8b-it")
+    max_per_concept = data.get("max_per_concept", 3)
+    high_quality_mode = data.get("high_quality_mode", False)
+
+    if not concepts:
+        return jsonify({"error": "No concepts provided"}), 400
+
+    agent = get_agent(FeatureSelectorAgent, high_quality_mode)
+    result = agent.search_and_select(
+        concepts,
+        target_model=target_model,
+        max_per_concept=max_per_concept
+    )
+
+    return jsonify({
+        "success": True,
+        "selected_features": result.get("selected_features", []),
+        "rejected_features": result.get("rejected_features", []),
+        "strategy": result.get("overall_strategy", "")
+    })
+
+
+@app.route("/api/pipeline/agents/eval-judge/evaluate", methods=["POST"])
+def api_eval_judge_evaluate():
+    """Evaluate a single steering result using the EvaluationJudgeAgent."""
+    data = request.json or {}
+
+    scenario = data.get("scenario", {})
+    default_response = data.get("default_response", "")
+    steered_response = data.get("steered_response", "")
+    features = data.get("features", [])
+    high_quality_mode = data.get("high_quality_mode", False)
+
+    if not scenario or not default_response or not steered_response:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    agent = get_agent(EvaluationJudgeAgent, high_quality_mode)
+    result = agent.evaluate(
+        scenario=scenario,
+        default_response=default_response,
+        steered_response=steered_response,
+        features_applied=features
+    )
+
+    return jsonify({
+        "success": True,
+        "evaluation": result
+    })
+
+
+# Review queue routes
+@app.route("/api/pipeline/review-queue")
+def api_review_queue_list():
+    """List items in the review queue."""
+    queue = load_review_queue()
+    status_filter = request.args.get("status", None)
+
+    if status_filter:
+        queue = [item for item in queue if item.get("status") == status_filter]
+
+    return jsonify(queue)
+
+
+@app.route("/api/pipeline/review-queue/<item_id>/verdict", methods=["POST"])
+def api_review_queue_verdict(item_id):
+    """Submit a human verdict for a review queue item."""
+    data = request.json or {}
+
+    verdict = data.get("verdict")  # "success", "failure", "exclude"
+    notes = data.get("notes", "")
+
+    if verdict not in ["success", "failure", "exclude"]:
+        return jsonify({"error": "Invalid verdict"}), 400
+
+    queue = load_review_queue()
+
+    for item in queue:
+        if item["id"] == item_id:
+            item["status"] = "reviewed"
+            item["human_verdict"] = verdict
+            item["notes"] = notes
+            item["reviewed_at"] = datetime.now().isoformat()
+            save_review_queue(queue)
+            return jsonify({"success": True, "item": item})
+
+    return jsonify({"error": "Item not found"}), 404
+
+
+@app.route("/api/pipeline/review-queue/stats")
+def api_review_queue_stats():
+    """Get statistics about the review queue."""
+    queue = load_review_queue()
+
+    pending = len([item for item in queue if item.get("status") == "pending"])
+    reviewed = len([item for item in queue if item.get("status") == "reviewed"])
+
+    verdicts = {}
+    for item in queue:
+        if item.get("status") == "reviewed":
+            v = item.get("human_verdict", "unknown")
+            verdicts[v] = verdicts.get(v, 0) + 1
+
+    return jsonify({
+        "total": len(queue),
+        "pending": pending,
+        "reviewed": reviewed,
+        "verdicts": verdicts
+    })
+
+
+# Pipeline scenarios (separate from manual scenarios)
+@app.route("/api/pipeline/scenarios")
+def api_pipeline_scenarios():
+    """List pipeline-generated scenarios."""
+    scenarios = load_pipeline_scenarios()
+    return jsonify(scenarios)
+
+
+# Probe routes (placeholder for now)
+@app.route("/api/pipeline/probes")
+def api_probes_list():
+    """List trained probes."""
+    # TODO: Implement probe listing
+    return jsonify([])
+
+
+@app.route("/api/pipeline/probes/create", methods=["POST"])
+def api_probes_create():
+    """Create a probe from successful steering results."""
+    # TODO: Implement probe creation
+    return jsonify({"error": "Not implemented yet"}), 501
 
 
 if __name__ == "__main__":
