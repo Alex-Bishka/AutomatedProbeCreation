@@ -31,6 +31,7 @@ from agents import (
     load_pipeline_config
 )
 from neuronpedia import steering_chat
+from logger import logger
 
 # Paths
 FRONTEND_DIR = Path(__file__).parent / "frontend"
@@ -365,6 +366,16 @@ class PipelineOrchestrator:
         })
         save_pipeline_jobs(jobs)
 
+        logger.info("="*60)
+        logger.info(f"Starting pipeline job: {self.job_id}")
+        logger.info(f"Configuration:")
+        logger.info(f"  - num_scenarios: {num_scenarios}")
+        logger.info(f"  - target_model: {target_model}")
+        logger.info(f"  - high_quality_mode: {self.high_quality_mode}")
+        logger.info(f"  - max_features_per_concept: {max_features_per_concept}")
+        logger.info(f"  - min_success_for_probe: {min_success_for_probe}")
+        logger.info("="*60)
+
         try:
             return self._run_pipeline(
                 num_scenarios,
@@ -413,6 +424,8 @@ class PipelineOrchestrator:
         templates = load_vetted_templates()
         results["templates_used"] = len(templates)
 
+        logger.info(f"Step 1: Loaded {len(templates)} vetted template scenarios")
+
         if not templates:
             raise ValueError("No vetted template scenarios found. Ensure scenarios exist in Fear/Survival or Corporate Loyalty categories.")
 
@@ -421,15 +434,40 @@ class PipelineOrchestrator:
         generated = self.scenario_agent.generate(templates, num_scenarios)
         results["scenarios_generated"] = len(generated)
 
+        logger.info(f"Step 2: Generated {len(generated)} scenarios")
+
         if not generated:
             raise ValueError("Scenario generation failed - no scenarios produced")
 
-        # Step 3: Quality check
+        # Step 3: Quality check with retry for concept extraction
         self._update_job_status("quality_check", 0, len(generated))
-        quality_result = self.quality_judge.evaluate(generated, templates)
 
-        approved_scenarios = quality_result.get("approved", [])
-        concepts = quality_result.get("extracted_concepts", [])
+        max_concept_retries = 3
+        approved_scenarios = []
+        concepts = []
+
+        for attempt in range(1, max_concept_retries + 1):
+            logger.info(f"Quality check attempt {attempt}/{max_concept_retries}")
+
+            quality_result = self.quality_judge.evaluate(generated, templates)
+            approved_scenarios = quality_result.get("approved", [])
+            concepts = quality_result.get("extracted_concepts", [])
+
+            logger.info(f"Attempt {attempt}: {len(approved_scenarios)} scenarios approved, {len(concepts)} concepts extracted")
+
+            if concepts:
+                logger.info(f"Concepts extracted: {concepts}")
+                break
+            else:
+                logger.warning(f"Attempt {attempt}: No concepts extracted from quality judge")
+                if attempt < max_concept_retries:
+                    logger.info(f"Retrying quality evaluation (attempt {attempt + 1}/{max_concept_retries})")
+
+        # After all retries, check if we have concepts
+        if not concepts:
+            error_msg = f"Failed to extract concepts after {max_concept_retries} attempts. Quality judge evaluation unsuccessful."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         results["scenarios_approved"] = len(approved_scenarios)
         results["concepts_extracted"] = concepts
@@ -446,13 +484,11 @@ class PipelineOrchestrator:
         save_pipeline_scenarios(existing_pipeline_scenarios)
 
         # Step 4: Select features
+        logger.info(f"Starting feature selection for {len(concepts)} concepts: {concepts}")
         self._update_job_status("selecting_features", 0, len(concepts))
-        concepts_used = concepts if concepts else ["deception", "dishonesty", "self-preservation"]
-        if not concepts:
-            results["concepts_extracted"] = concepts_used
 
         feature_result = self.feature_agent.search_and_select(
-            concepts_used,
+            concepts,
             target_model=target_model,
             max_per_concept=max_features_per_concept
         )
@@ -461,7 +497,23 @@ class PipelineOrchestrator:
         feature_search_metadata = feature_result.get("search_metadata", {})
         overall_strategy = feature_result.get("overall_strategy", "")
 
+        # Log feature selection results
+        logger.info(f"Feature selection complete:")
+        logger.info(f"  - Selected: {len(selected_features)} features")
+        logger.info(f"  - Rejected: {len(rejected_features)} features")
+
+        # Log per-concept breakdown
+        for concept, meta in feature_search_metadata.items():
+            selected_count = len([f for f in selected_features if f.get("concept") == concept])
+            logger.info(f"  - Concept '{concept}': {selected_count} features selected from {meta.get('search_results_count', 0)} search results")
+
+        if selected_features:
+            logger.info(f"Selected features summary:")
+            for feat in selected_features:
+                logger.info(f"  - Layer {feat.get('layer')}, Index {feat.get('index')}: {feat.get('description', '')[:80]}...")
+
         results["features_selected"] = selected_features
+        results["features_rejected_count"] = len(rejected_features)
         results["layer_dedup_info"] = {
             "applied": feature_result.get("layer_deduplication_applied", False),
             "before": feature_result.get("features_before_dedup", len(selected_features)),
@@ -469,11 +521,18 @@ class PipelineOrchestrator:
         }
 
         if not selected_features:
+            logger.error("No features selected for steering")
             raise ValueError("No features selected for steering")
 
         # Load test strengths from config
         pipeline_config = load_pipeline_config()
         test_strengths = pipeline_config.get("steering_params", {}).get("test_strengths", [2, 5, 10])
+
+        logger.info(f"Step 5: Starting steering experiments")
+        logger.info(f"  - Features to test: {len(selected_features)}")
+        logger.info(f"  - Test strengths: {test_strengths}")
+        logger.info(f"  - Scenarios: {len(approved_scenarios)}")
+        logger.info(f"  - Total experiments: {len(selected_features) * len(test_strengths) * len(approved_scenarios)}")
 
         # Step 5: Run steering experiments (one feature at a time, multiple strengths)
         experiments = self._run_steering_experiments(
@@ -487,6 +546,7 @@ class PipelineOrchestrator:
         results["test_strengths"] = test_strengths
 
         # Step 6: Evaluate results per feature, per strength
+        logger.info(f"Step 6: Evaluating steering results")
         self._update_job_status("evaluating", 0, len(experiments))
         feature_evaluations = []
         training_set = []
@@ -636,7 +696,7 @@ class PipelineOrchestrator:
             "generated_scenarios": generated,  # All scenarios before QA
             "quality_result": quality_result,  # Full QA output with rejections
             "approved_scenarios": approved_scenarios,  # Scenarios that passed QA
-            "concepts_used": concepts_used,  # Concepts for feature search
+            "concepts": concepts,  # Concepts for feature search
             "feature_selection": {
                 "selected_features": selected_features,
                 "rejected_features": rejected_features,
@@ -651,7 +711,7 @@ class PipelineOrchestrator:
                 "templates_used": len(templates),
                 "scenarios_generated": len(generated),
                 "scenarios_approved": len(approved_scenarios),
-                "concepts_count": len(concepts_used),
+                "concepts_count": len(concepts),
                 "features_selected": len(selected_features),
                 "features_rejected": len(rejected_features),
                 "test_strengths": test_strengths,
@@ -684,6 +744,18 @@ class PipelineOrchestrator:
                 }
                 break
         save_pipeline_jobs(jobs)
+
+        logger.info("="*60)
+        logger.info(f"Pipeline job {self.job_id} completed successfully")
+        logger.info(f"Results summary:")
+        logger.info(f"  - Scenarios generated: {results['scenarios_generated']}")
+        logger.info(f"  - Scenarios approved: {results['scenarios_approved']}")
+        logger.info(f"  - Concepts extracted: {len(results['concepts_extracted'])}")
+        logger.info(f"  - Features selected: {len(results['features_selected'])}")
+        logger.info(f"  - Successes: {results['successes']}")
+        logger.info(f"  - Failures: {results['failures']}")
+        logger.info(f"  - Review items: {results['review_queue_items']}")
+        logger.info("="*60)
 
         return results
 

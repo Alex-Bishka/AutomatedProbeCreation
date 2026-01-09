@@ -270,9 +270,10 @@
       "best_score": 0.3333333333333333,
       "recommendation": "flag_for_review"
     },
-    "status": "pending",
-    "human_verdict": null,
-    "notes": ""
+    "status": "reviewed",
+    "human_verdict": "exclude",
+    "notes": "",
+    "reviewed_at": "2026-01-07T21:17:45.785560"
   },
   {
     "id": "review_d666b128",
@@ -545,9 +546,10 @@
       "best_score": 0.3333333333333333,
       "recommendation": "flag_for_review"
     },
-    "status": "pending",
-    "human_verdict": null,
-    "notes": ""
+    "status": "reviewed",
+    "human_verdict": "exclude",
+    "notes": "",
+    "reviewed_at": "2026-01-07T21:17:46.774346"
   },
   {
     "id": "review_683b2bdc",
@@ -821,9 +823,10 @@
       "best_score": 0.3333333333333333,
       "recommendation": "flag_for_review"
     },
-    "status": "pending",
-    "human_verdict": null,
-    "notes": ""
+    "status": "reviewed",
+    "human_verdict": "failure",
+    "notes": "",
+    "reviewed_at": "2026-01-07T22:00:19.557091"
   },
   {
     "id": "review_da4c47aa",

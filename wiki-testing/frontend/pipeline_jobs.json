@@ -1,51 +1,7 @@
 [
   {
-    "id": "job_20260102_151025_638d69",
-    "created_at": "2026-01-02T15:10:25.504717",
-    "config": {
-      "num_scenarios": 1,
-      "target_model": "llama3.1-8b-it",
-      "high_quality_mode": false,
-      "max_features_per_concept": 1
-    },
-    "status": "completed",
-    "progress": {
-      "step": "finalizing",
-      "current": 0,
-      "total": 0,
-      "updated_at": "2026-01-02T15:14:38.064478",
-      "feature_layer": "23-resid-post-aa",
-      "feature_index": "83955",
-      "current_strength": 10
-    },
-    "results": {
-      "templates_used": 10,
-      "scenarios_generated": 1,
-      "scenarios_approved": 1,
-      "concepts": [
-        "knowledge hiding",
-        "liability avoidance",
-        "self-preservation",
-        "reputation protection",
-        "copyright infringement avoidance"
-      ],
-      "features_count": 5,
-      "test_strengths": [
-        2,
-        5,
-        10
-      ],
-      "total_steering_calls": 15,
-      "successes": 5,
-      "failures": 0,
-      "review_items": 0,
-      "training_set_size": 5
-    },
-    "error": null
-  },
-  {
-    "id": "job_20260105_182418_141629",
-    "created_at": "2026-01-05T18:24:18.292747",
+    "id": "job_20260108_125154_c151a4",
+    "created_at": "2026-01-08T12:51:54.134274",
     "config": {
       "num_scenarios": 1,
       "target_model": "llama3.1-8b-it",
@@ -57,9 +13,9 @@
       "step": "finalizing",
       "current": 0,
       "total": 0,
-      "updated_at": "2026-01-05T18:25:36.160790",
-      "feature_layer": "11-resid-post-aa",
-      "feature_index": "35980",
+      "updated_at": "2026-01-08T12:58:50.768815",
+      "feature_layer": "3-resid-post-aa",
+      "feature_index": 24867,
       "current_strength": 10
     },
     "results": {
@@ -67,12 +23,12 @@
       "scenarios_generated": 1,
       "scenarios_approved": 1,
       "concepts": [
-        "competitive secrecy",
-        "information control",
-        "self-preservation",
-        "industrial espionage"
+        "plagiarism",
+        "attribution",
+        "honesty",
+        "self-preservation"
       ],
-      "features_count": 8,
+      "features_count": 5,
       "test_strengths": [
         -10,
         -5,
@@ -81,11 +37,11 @@
         5,
         10
       ],
-      "total_steering_calls": 48,
-      "successes": 0,
-      "failures": 8,
+      "total_steering_calls": 30,
+      "successes": 5,
+      "failures": 0,
       "review_items": 0,
-      "training_set_size": 0
+      "training_set_size": 5
     },
     "error": null
   }

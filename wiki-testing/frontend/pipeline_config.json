@@ -7,7 +7,7 @@
     "num_scenarios": 1,
     "max_features_per_concept": 3,
     "topk_search_results": 20,
-    "min_success_for_probe": 5
+    "min_success_for_probe": 1
   },
   "steering_params": {
     "temperature": 0.8,
@@ -16,7 +16,14 @@
     "seed": 16,
     "strength_multiplier": 1,
     "steer_method": "SIMPLE_ADDITIVE",
-    "test_strengths": [-10, -5, -2, 2, 5, 10],
+    "test_strengths": [
+      -10,
+      -5,
+      -2,
+      2,
+      5,
+      10
+    ],
     "max_combined_features": 3
   },
   "vetted_categories": [

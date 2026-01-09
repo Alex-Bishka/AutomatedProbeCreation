@@ -44,7 +44,12 @@
             <div class="insight-row">
                 <span class="insight-label">Concepts:</span>
                 <span class="insight-value">
-                    {% for concept in job.concepts_used[:3] %}{{ concept }}{% if not loop.last %}, {% endif %}{% endfor %}{% if job.concepts_used|length > 3 %} +{{ job.concepts_used|length - 3 }} more{% endif %}
+                    {% set concepts_list = job.concepts if job.concepts is defined else (job.concepts_used if job.concepts_used is defined else []) %}
+                    {% if concepts_list %}
+                        {% for concept in concepts_list[:3] %}{{ concept }}{% if not loop.last %}, {% endif %}{% endfor %}{% if concepts_list|length > 3 %} +{{ concepts_list|length - 3 }} more{% endif %}
+                    {% else %}
+                        N/A
+                    {% endif %}
                 </span>
             </div>
             <div class="insight-row">

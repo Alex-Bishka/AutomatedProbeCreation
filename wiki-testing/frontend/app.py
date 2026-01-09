@@ -1146,7 +1146,8 @@ from agents import (
 def pipeline_page():
     """Pipeline configuration and launch page."""
     jobs = list_jobs(limit=10)
-    return render_template("pipeline.html", jobs=jobs)
+    config = load_pipeline_config()
+    return render_template("pipeline.html", jobs=jobs, config=config)
 
 
 @app.route("/pipeline/job/<job_id>")

@@ -14,7 +14,7 @@
 
         <div class="form-group">
             <label for="num-scenarios">Number of Scenarios to Generate</label>
-            <input type="number" id="num-scenarios" value="5" min="1" max="20">
+            <input type="number" id="num-scenarios" value="{{ config.pipeline_defaults.num_scenarios if config.pipeline_defaults else 5 }}" min="1" max="20">
         </div>
 
         <div class="form-group">
@@ -28,13 +28,13 @@
 
         <div class="form-group">
             <label for="max-features">Max Features per Concept</label>
-            <input type="number" id="max-features" value="3" min="1" max="10">
+            <input type="number" id="max-features" value="{{ config.pipeline_defaults.max_features_per_concept if config.pipeline_defaults else 3 }}" min="1" max="10">
         </div>
 
-        <div class="form-group">
-            <label style="display: flex; align-items: center; gap: 0.5rem;">
-                <input type="checkbox" id="high-quality-mode">
-                High Quality Mode (uses Gemini 2.5 Pro instead of Flash)
+        <div style="text-align: left;">
+            <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="high-quality-mode" style="margin-right: 8px;">
+                <span style="white-space: nowrap;">High Quality Mode (uses Gemini 2.5 Pro instead)</span>
             </label>
         </div>
 
@@ -294,9 +294,6 @@ function showResults(data) {
     font-size: 1rem;
 }
 
-.form-group input[type="checkbox"] {
-    margin-right: 0.5rem;
-}
 
 .progress-container {
     background: #e0e0e0;

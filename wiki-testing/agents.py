@@ -24,6 +24,7 @@ sys.path.remove(_parent_dir)  # Remove to avoid polluting imports for other modu
 # Import from local wiki-testing module
 from neuronpedia import search_features
 from pathlib import Path
+from logger import logger
 
 # Config file path
 CONFIG_FILE = Path(__file__).parent / "frontend" / "pipeline_config.json"
@@ -490,6 +491,8 @@ OUTPUT FORMAT - Return JSON:
         search_metadata = {}  # Track per-concept search results
 
         for concept in concepts:
+            logger.info(f"Searching features for concept: '{concept}'")
+
             concept_meta = {
                 "query": concept,
                 "target_model": target_model,
@@ -506,13 +509,16 @@ OUTPUT FORMAT - Return JSON:
                 search_results = api_response.get("results", [])[:topk]
                 concept_meta["search_results_count"] = len(api_response.get("results", []))
                 concept_meta["search_results"] = search_results
+                logger.info(f"  Found {len(api_response.get('results', []))} results, analyzing top {len(search_results)}")
             except Exception as e:
+                logger.error(f"  Search failed for concept '{concept}': {str(e)}")
                 concept_meta["error"] = str(e)
                 concept_strategies.append(f"{concept}: Search failed - {str(e)}")
                 search_metadata[concept] = concept_meta
                 continue
 
             if not search_results:
+                logger.warning(f"  No features found for concept '{concept}'")
                 concept_meta["error"] = "No features found"
                 concept_strategies.append(f"{concept}: No features found")
                 search_metadata[concept] = concept_meta
