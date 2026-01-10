@@ -561,6 +561,87 @@
     </div>
 </div>
 
+<!-- Mixed Feature Steering Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Mixed Feature Steering
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.mixed_steering %}
+        {% if job.mixed_steering.features %}
+        <div class="mix-summary">
+            <h4>Agent-Selected Mix</h4>
+            <div class="feature-tags">
+                {% for feat in job.mixed_steering.features %}
+                <span class="feature-tag">{{ feat.layer }}:{{ feat.index }} ({{ feat.strength }})</span>
+                {% endfor %}
+            </div>
+            {% if job.mixed_steering.rationale %}
+            <p class="mix-note"><strong>Rationale:</strong> {{ job.mixed_steering.rationale }}</p>
+            {% endif %}
+            {% if job.mixed_steering.expected_effect %}
+            <p class="mix-note"><strong>Expected Effect:</strong> {{ job.mixed_steering.expected_effect }}</p>
+            {% endif %}
+            {% if job.mixed_steering.risk_notes %}
+            <p class="mix-note"><strong>Risks:</strong> {{ job.mixed_steering.risk_notes }}</p>
+            {% endif %}
+            {% if job.mixed_steering.summary %}
+            <p class="text-muted">
+                {{ job.mixed_steering.summary.approved if job.mixed_steering.summary.approved is not none else 0 }}
+                approved / {{ job.mixed_steering.summary.total if job.mixed_steering.summary.total is not none else 0 }}
+                total
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if job.mixed_steering.results %}
+        <div class="steering-results">
+            {% for result in job.mixed_steering.results %}
+            <div class="steering-result-item {% if result.evaluation and result.evaluation.recommendation == 'include_in_training' %}approved{% endif %}">
+                <div class="result-header">
+                    <strong>{{ result.scenario_name }}</strong>
+                    <div class="eval-badges">
+                        {% if result.evaluation and result.evaluation.classification %}
+                        <span class="classification-badge {{ result.evaluation.classification }}">
+                            {{ result.evaluation.classification }}
+                        </span>
+                        {% endif %}
+                        {% if result.evaluation and result.evaluation.recommendation %}
+                        <span class="recommendation-badge {{ result.evaluation.recommendation }}">
+                            {{ result.evaluation.recommendation | replace('_', ' ') | title }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if result.error %}
+                <div class="error-message">{{ result.error }}</div>
+                {% else %}
+                <div class="response-comparison">
+                    <div class="response-col default">
+                        <h5>Default</h5>
+                        <div class="response-text">{{ result.default[:500] if result.default else 'No response' }}{% if result.default and result.default|length > 500 %}...{% endif %}</div>
+                    </div>
+                    <div class="response-col steered">
+                        <h5>Steered (Mixed)</h5>
+                        <div class="response-text">{{ result.steered[:500] if result.steered else 'No response' }}{% if result.steered and result.steered|length > 500 %}...{% endif %}</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No mixed steering results available.</p>
+        {% endif %}
+        {% else %}
+        <p class="text-muted">No mixed feature steering data available.</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Raw JSON Section -->
 <div class="section collapsible">
     <h3 class="section-header" onclick="toggleSection(this)">
@@ -682,6 +763,11 @@ document.addEventListener('DOMContentLoaded', function() {
     border-radius: 6px;
     padding: 1rem;
     margin-bottom: 1rem;
+}
+
+.steering-result-item.approved {
+    border-left: 4px solid #10b981;
+    background: #ecfdf5;
 }
 
 .template-header, .scenario-header, .result-header, .eval-header {
@@ -952,6 +1038,19 @@ document.addEventListener('DOMContentLoaded', function() {
     border-radius: 4px;
     font-size: 0.8rem;
     font-family: monospace;
+}
+
+.mix-summary {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.mix-note {
+    margin: 0.5rem 0 0 0;
+    color: #334155;
 }
 
 .raw-json {

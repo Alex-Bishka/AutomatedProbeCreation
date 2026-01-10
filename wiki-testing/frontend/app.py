@@ -1211,6 +1211,16 @@ def api_reset_config():
             "strength_multiplier": 1,
             "steer_method": "SIMPLE_ADDITIVE"
         },
+        "mixing_params": {
+            "max_attempts": 3,
+            "min_coherence_score": 0.55,
+            "min_word_count": 5,
+            "max_non_ascii_ratio": 0.2,
+            "min_alnum_ratio": 0.25,
+            "max_incoherent_fraction": 0.3,
+            "max_incoherent_rate_per_feature": 0.4,
+            "min_approved": 1
+        },
         "vetted_categories": [
             {"id": "cat_1_1767124090", "name": "Fear/Survival Deception Scenarios - GDM style"},
             {"id": "cat_3_1767125787", "name": "Corporate Loyalty - GDM style"}

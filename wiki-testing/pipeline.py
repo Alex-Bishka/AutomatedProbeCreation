@@ -15,6 +15,7 @@ import os
 import json
 import time
 import uuid
+import re
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
@@ -23,6 +24,7 @@ from agents import (
     ScenarioCreatorAgent,
     ScenarioQualityJudge,
     FeatureSelectorAgent,
+    FeatureMixAgent,
     EvaluationJudgeAgent,
     DEFAULT_MODEL,
     HIGH_QUALITY_MODEL,
@@ -187,6 +189,7 @@ class PipelineOrchestrator:
         self.scenario_agent = ScenarioCreatorAgent(self.model)
         self.quality_judge = ScenarioQualityJudge(self.model)
         self.feature_agent = FeatureSelectorAgent(self.model)
+        self.mix_agent = FeatureMixAgent(self.model)
         self.eval_judge = EvaluationJudgeAgent(self.model)
 
         # Job tracking
@@ -327,6 +330,244 @@ class PipelineOrchestrator:
             experiments.append(feature_experiment)
 
         return experiments
+
+    def _coherence_metrics(self, text: str) -> dict:
+        """Compute simple coherence metrics for a text response."""
+        if not text:
+            return {
+                "score": 0.0,
+                "word_count": 0,
+                "non_ascii_ratio": 1.0,
+                "alnum_ratio": 0.0,
+                "printable_ratio": 0.0
+            }
+
+        total = len(text)
+        ascii_count = sum(1 for c in text if ord(c) < 128)
+        printable_count = sum(1 for c in text if c.isprintable())
+        alnum_space_count = sum(1 for c in text if c.isalnum() or c.isspace())
+        words = re.findall(r"[A-Za-z]{2,}", text)
+        word_count = len(words)
+
+        non_ascii_ratio = 1.0 - (ascii_count / total)
+        printable_ratio = printable_count / total
+        alnum_ratio = alnum_space_count / total
+
+        score = (0.5 * printable_ratio) + (0.3 * alnum_ratio) + (0.2 * min(word_count / 20, 1.0))
+        score -= non_ascii_ratio * 0.5
+        score = max(0.0, min(1.0, score))
+
+        return {
+            "score": score,
+            "word_count": word_count,
+            "non_ascii_ratio": non_ascii_ratio,
+            "alnum_ratio": alnum_ratio,
+            "printable_ratio": printable_ratio
+        }
+
+    def _is_coherent(self, metrics: dict, params: dict) -> bool:
+        """Determine if a response is coherent based on thresholds."""
+        min_score = params.get("min_coherence_score", 0.55)
+        min_words = params.get("min_word_count", 5)
+        max_non_ascii = params.get("max_non_ascii_ratio", 0.2)
+        min_alnum_ratio = params.get("min_alnum_ratio", 0.25)
+
+        return (
+            metrics.get("score", 0) >= min_score
+            and metrics.get("word_count", 0) >= min_words
+            and metrics.get("non_ascii_ratio", 1.0) <= max_non_ascii
+            and metrics.get("alnum_ratio", 0.0) >= min_alnum_ratio
+        )
+
+    def _build_mix_candidates(
+        self,
+        feature_evaluations: list[dict],
+        experiments: list[dict],
+        coherence_params: dict
+    ) -> list[dict]:
+        """Build candidate list for mix selection from per-feature evaluations."""
+        experiment_map = {}
+        for experiment in experiments:
+            feature = experiment.get("feature", {})
+            key = (feature.get("layer", ""), int(feature.get("index", 0)))
+            experiment_map[key] = experiment
+
+        candidates = []
+        for feat_eval in feature_evaluations:
+            feature = feat_eval.get("feature", {})
+            best_strength = feat_eval.get("best_strength")
+            if best_strength is None:
+                continue
+
+            avg_coherence = 0.0
+            incoherent_rate = 0.0
+            experiment = experiment_map.get((feature.get("layer", ""), int(feature.get("index", 0))))
+            if experiment:
+                strength_results = experiment.get("strength_results", {})
+                results = strength_results.get(best_strength)
+                if results is None:
+                    results = strength_results.get(str(best_strength))
+
+                if results:
+                    scores = []
+                    incoherent = 0
+                    for result in results:
+                        metrics = self._coherence_metrics(result.get("steered", ""))
+                        scores.append(metrics["score"])
+                        if not self._is_coherent(metrics, coherence_params):
+                            incoherent += 1
+                    avg_coherence = sum(scores) / len(scores) if scores else 0.0
+                    incoherent_rate = incoherent / len(scores) if scores else 0.0
+
+            if avg_coherence and avg_coherence < coherence_params.get("min_coherence_score", 0.55):
+                continue
+            if incoherent_rate > coherence_params.get("max_incoherent_rate_per_feature", 0.4):
+                continue
+
+            candidates.append({
+                "layer": feature.get("layer", ""),
+                "index": feature.get("index", 0),
+                "description": feature.get("description", ""),
+                "concept": feature.get("concept", ""),
+                "best_strength": best_strength,
+                "best_score": feat_eval.get("best_score", 0),
+                "recommendation": feat_eval.get("recommendation", ""),
+                "coherence_score": avg_coherence,
+                "incoherent_rate": incoherent_rate
+            })
+        return candidates
+
+    def _normalize_mixed_features(self, mix_result: dict, candidates: list[dict]) -> list[dict]:
+        """Normalize mixed features and fill missing strengths from candidates."""
+        if not mix_result:
+            return []
+
+        raw_features = mix_result.get("mixed_features", [])
+        if not isinstance(raw_features, list):
+            return []
+
+        candidate_map = {}
+        for candidate in candidates:
+            key = (candidate.get("layer", ""), int(candidate.get("index", 0)))
+            candidate_map[key] = candidate
+
+        normalized = []
+        for feature in raw_features:
+            layer = feature.get("layer", "")
+            index = feature.get("index", None)
+            if not layer or index is None:
+                continue
+            try:
+                index = int(index)
+            except (TypeError, ValueError):
+                continue
+
+            candidate = candidate_map.get((layer, index), {})
+            strength = feature.get("strength")
+            if strength is None:
+                strength = candidate.get("best_strength")
+            if strength is None:
+                continue
+
+            normalized.append({
+                "layer": layer,
+                "index": index,
+                "strength": strength,
+                "concept": feature.get("concept", candidate.get("concept", "")),
+                "description": candidate.get("description", ""),
+                "reasoning": feature.get("reasoning", "")
+            })
+
+        return normalized
+
+    def _fallback_mixed_features(self, candidates: list[dict], max_features: int) -> list[dict]:
+        """Fallback mix selection when the mix agent fails."""
+        def score(candidate: dict) -> tuple:
+            recommendation = candidate.get("recommendation", "")
+            rec_score = 1 if recommendation == "include_in_training" else 0
+            return (rec_score, candidate.get("best_score", 0))
+
+        ranked = sorted(candidates, key=score, reverse=True)
+        mixed = []
+        for candidate in ranked[:max_features]:
+            if candidate.get("best_strength") is None:
+                continue
+            mixed.append({
+                "layer": candidate.get("layer", ""),
+                "index": int(candidate.get("index", 0)),
+                "strength": candidate.get("best_strength"),
+                "concept": candidate.get("concept", ""),
+                "description": candidate.get("description", ""),
+                "reasoning": "Fallback mix based on single-feature success rate."
+            })
+        return mixed
+
+    def _run_mixed_steering(
+        self,
+        scenarios: list[dict],
+        mixed_features: list[dict],
+        target_model: str,
+        coherence_params: dict
+    ) -> list[dict]:
+        """Run steering with a combined feature mix across scenarios."""
+        results = []
+        steering_config = []
+        for feature in mixed_features:
+            steering_config.append({
+                "modelId": target_model,
+                "layer": feature.get("layer", ""),
+                "index": feature.get("index", 0),
+                "strength": feature.get("strength", 0)
+            })
+
+        for scenario in scenarios:
+            scenario_name = scenario.get("name", "Unknown")
+            messages = scenario.get("messages", [])
+            try:
+                default_resp, steered_resp = steering_chat(
+                    messages,
+                    steering_config,
+                    model=target_model
+                )
+                default_text = extract_response(default_resp)
+                steered_text = extract_response(steered_resp)
+
+                evaluation = self.eval_judge.evaluate(
+                    scenario=scenario,
+                    default_response=default_text,
+                    steered_response=steered_text,
+                    features_applied=steering_config
+                )
+
+                coherence = self._coherence_metrics(steered_text)
+                is_coherent = self._is_coherent(coherence, coherence_params)
+                if not is_coherent:
+                    evaluation = evaluation or {}
+                    evaluation["classification"] = "failure"
+                    evaluation["recommendation"] = "exclude"
+                    evaluation["review_reason"] = "Incoherent output (automatic filter)"
+                    evaluation["coherence_override"] = True
+
+                results.append({
+                    "scenario_name": scenario_name,
+                    "scenario": scenario,
+                    "default": default_text,
+                    "steered": steered_text,
+                    "evaluation": evaluation,
+                    "coherence": coherence,
+                    "error": None
+                })
+            except Exception as e:
+                results.append({
+                    "scenario_name": scenario_name,
+                    "scenario": scenario,
+                    "default": "",
+                    "steered": "",
+                    "evaluation": None,
+                    "error": str(e)
+                })
+
+        return results
 
     def run(
         self,
@@ -669,6 +910,113 @@ class PipelineOrchestrator:
         results["review_queue_items"] = review_items
         results["training_set_size"] = len(training_set)
 
+        # Step 6.5: Build and test a mixed-feature steering set (iterative)
+        logger.info("Step 6.5: Building mixed-feature steering set")
+        self._update_job_status("mixing_features")
+
+        default_mixing_params = {
+            "max_attempts": 3,
+            "min_coherence_score": 0.55,
+            "min_word_count": 5,
+            "max_non_ascii_ratio": 0.2,
+            "min_alnum_ratio": 0.25,
+            "max_incoherent_fraction": 0.3,
+            "max_incoherent_rate_per_feature": 0.4,
+            "min_approved": 1
+        }
+        mixing_params = {**default_mixing_params, **pipeline_config.get("mixing_params", {})}
+
+        max_combined_features = pipeline_config.get("steering_params", {}).get("max_combined_features", 3)
+        mix_candidates = self._build_mix_candidates(feature_evaluations, experiments, mixing_params)
+
+        mix_result = None
+        mixed_features = []
+        mixed_results = []
+        mix_attempts = []
+        feedback = ""
+
+        for attempt in range(1, mixing_params["max_attempts"] + 1):
+            if not mix_candidates:
+                logger.warning("No viable mix candidates after coherence filtering")
+                break
+
+            mix_result = self.mix_agent.create_mix(
+                mix_candidates,
+                max_features=max_combined_features,
+                feedback=feedback
+            )
+            mixed_features = self._normalize_mixed_features(mix_result or {}, mix_candidates)
+
+            if not mixed_features and mix_candidates:
+                mixed_features = self._fallback_mixed_features(mix_candidates, max_combined_features)
+                mix_result = mix_result or {}
+                mix_result.setdefault("rationale", "Fallback mix based on single-feature success rates.")
+
+            if not mixed_features:
+                logger.warning("Mix agent produced no usable features")
+                break
+
+            logger.info(f"Running mixed-feature steering (attempt {attempt}) with {len(mixed_features)} features")
+            mixed_results = self._run_mixed_steering(
+                approved_scenarios,
+                mixed_features,
+                target_model,
+                mixing_params
+            )
+
+            total = len(mixed_results)
+            incoherent = sum(1 for r in mixed_results if r.get("evaluation", {}).get("coherence_override"))
+            approved = sum(1 for r in mixed_results if r.get("evaluation", {}).get("recommendation") == "include_in_training")
+            incoherent_fraction = (incoherent / total) if total else 1.0
+
+            mix_attempts.append({
+                "attempt": attempt,
+                "features": mixed_features,
+                "summary": {
+                    "total": total,
+                    "approved": approved,
+                    "incoherent": incoherent,
+                    "incoherent_fraction": incoherent_fraction
+                },
+                "feedback": feedback
+            })
+
+            if incoherent_fraction > mixing_params["max_incoherent_fraction"]:
+                feedback = (
+                    f"Outputs were incoherent in {incoherent}/{total} cases "
+                    f"({incoherent_fraction:.2f}). Select fewer features with higher coherence_score "
+                    "and avoid conflicting directions."
+                )
+                continue
+
+            if approved < mixing_params["min_approved"]:
+                feedback = (
+                    f"Only {approved}/{total} were approved. Choose features with higher best_score "
+                    "and stronger single-feature performance."
+                )
+                continue
+
+            break
+
+        if not mixed_features:
+            logger.warning("No mixed-feature steering set created")
+
+        results["mixed_steering"] = {
+            "features": mixed_features,
+            "rationale": (mix_result or {}).get("rationale", ""),
+            "expected_effect": (mix_result or {}).get("expected_effect", ""),
+            "risk_notes": (mix_result or {}).get("risk_notes", ""),
+            "results": mixed_results,
+            "attempts": mix_attempts,
+            "summary": {
+                "total": len(mixed_results),
+                "approved": sum(
+                    1 for r in mixed_results
+                    if r.get("evaluation", {}).get("recommendation") == "include_in_training"
+                )
+            }
+        }
+
         # Step 7: Create probe if enough successes
         self._update_job_status("finalizing")
         if len(training_set) >= min_success_for_probe:
@@ -707,6 +1055,7 @@ class PipelineOrchestrator:
             "experiments": experiments,  # Per-feature, per-strength steering results
             "feature_evaluations": feature_evaluations,  # Evaluation per feature with best strength
             "training_set": training_set,  # Successful examples
+            "mixed_steering": results.get("mixed_steering", {}),
             "summary": {
                 "templates_used": len(templates),
                 "scenarios_generated": len(generated),
@@ -719,7 +1068,9 @@ class PipelineOrchestrator:
                 "successes": total_successes,
                 "failures": total_failures,
                 "review_items": review_items,
-                "training_set_size": len(training_set)
+                "training_set_size": len(training_set),
+                "mixed_total": results.get("mixed_steering", {}).get("summary", {}).get("total", 0),
+                "mixed_approved": results.get("mixed_steering", {}).get("summary", {}).get("approved", 0)
             }
         }
         save_job_details(self.job_id, detailed_results)

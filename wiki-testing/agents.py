@@ -1,11 +1,12 @@
 """
 Agentic Deception Probe Pipeline - Agent Classes
 
-This module contains 4 LLM agents for the automated deception probe pipeline:
+This module contains 5 LLM agents for the automated deception probe pipeline:
 1. ScenarioCreatorAgent - Autonomous scenario generation
 2. ScenarioQualityJudge - Quality assurance for generated scenarios
 3. FeatureSelectorAgent - SAE feature selection from Neuronpedia
-4. EvaluationJudgeAgent - Deception improvement evaluation
+4. FeatureMixAgent - Multi-feature steering mix selection
+5. EvaluationJudgeAgent - Deception improvement evaluation
 """
 
 import os
@@ -89,6 +90,12 @@ def get_agent_info() -> list:
             "display_name": "Feature Selector",
             "purpose": "Selects SAE features for steering from Neuronpedia",
             "default_prompt": FeatureSelectorAgent.SYSTEM_PROMPT if 'FeatureSelectorAgent' in globals() else "(Not loaded)"
+        },
+        {
+            "name": "feature_mixer",
+            "display_name": "Feature Mixer",
+            "purpose": "Builds an optimal multi-feature steering mix",
+            "default_prompt": FeatureMixAgent.SYSTEM_PROMPT if 'FeatureMixAgent' in globals() else "(Not loaded)"
         },
         {
             "name": "evaluation_judge",
@@ -585,6 +592,97 @@ Return your analysis as JSON."""
                 if attempt < max_retries - 1:
                     time.sleep(1)
 
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    return None
+
+        return None
+
+
+class FeatureMixAgent(Agent):
+    """
+    Multi-feature mix selection agent.
+
+    Chooses a small set of features (with strengths) to combine for steering.
+    """
+
+    SYSTEM_PROMPT = """You are an expert at composing multi-feature SAE steering mixes.
+
+Your task is to select a SMALL set of features (up to a provided maximum) that will work well together when applied simultaneously.
+
+You will be given candidate features with:
+- layer, index, description, concept
+- best_strength (optimal strength found in single-feature testing)
+- best_score (success rate from single-feature testing)
+- recommendation (include_in_training | flag_for_review | reject)
+- coherence_score and incoherent_rate from single-feature outputs
+
+SELECTION GUIDELINES:
+1. Prefer features with higher best_score and recommendation = include_in_training.
+2. PRIORITIZE COHERENCE: avoid features with low coherence_score or high incoherent_rate.
+3. Ensure the mix is coherent (avoid contradictory or unrelated concepts).
+4. Respect directionality: do not combine features that push in conflicting directions.
+5. Use the provided best_strength for each feature unless you have a strong reason to adjust.
+6. Keep the mix small to preserve coherence and interpretability.
+
+If you receive feedback from a previous attempt (e.g., incoherent output), you MUST adjust the mix to improve coherence:
+- Prefer fewer features
+- Prefer features with higher coherence_score
+- Avoid extreme or conflicting strengths
+
+OUTPUT FORMAT - Return JSON:
+{
+  "mixed_features": [
+    {
+      "layer": "layer-id",
+      "index": feature_index,
+      "strength": -10 to 10,
+      "concept": "optional concept label",
+      "reasoning": "Why this feature belongs in the mix"
+    }
+  ],
+  "rationale": "Overall rationale for the mix",
+  "expected_effect": "What behavior this mix should produce",
+  "risk_notes": "Potential risks (e.g., incoherence)"
+}
+
+If no safe mix exists, return an empty mixed_features list and explain why in rationale."""
+
+    def __init__(self, model_name: str = DEFAULT_MODEL):
+        super().__init__(model_name=model_name, system_prompt=self.SYSTEM_PROMPT)
+
+    def create_mix(
+        self,
+        candidates: list[dict],
+        max_features: int = 3,
+        max_retries: int = 3,
+        feedback: str = ""
+    ) -> Optional[dict]:
+        """Select an optimal mix of features from candidates."""
+        candidates_text = json.dumps(candidates, indent=2)
+
+        feedback_text = f"\n\nFEEDBACK FROM PREVIOUS ATTEMPT:\n{feedback}\n" if feedback else ""
+
+        user_prompt = f"""Select an optimal multi-feature mix (max {max_features} features) from the candidates below.
+
+CANDIDATES:
+{candidates_text}
+{feedback_text}
+
+Return ONLY valid JSON in the specified format."""
+
+        for attempt in range(max_retries):
+            try:
+                response = self.call_agent(user_prompt)
+                result = parse_json_response(response)
+
+                if result and isinstance(result, dict):
+                    return result
+
+                if attempt < max_retries - 1:
+                    time.sleep(1)
             except Exception as e:
                 if attempt < max_retries - 1:
                     time.sleep(2 ** attempt)
