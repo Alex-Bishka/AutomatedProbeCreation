@@ -27,7 +27,7 @@
     "max_combined_features": 3
   },
   "mixing_params": {
-    "max_attempts": 3,
+    "max_attempts": 10,
     "min_coherence_score": 0.55,
     "min_word_count": 5,
     "max_non_ascii_ratio": 0.2,

@@ -593,6 +593,9 @@
                 total
             </p>
             {% endif %}
+            {% if job.mixed_steering.outcome_explanation %}
+            <p class="mix-note"><strong>Outcome:</strong> {{ job.mixed_steering.outcome_explanation }}</p>
+            {% endif %}
         </div>
         {% endif %}
 

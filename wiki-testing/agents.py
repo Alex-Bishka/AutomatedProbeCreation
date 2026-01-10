@@ -14,7 +14,10 @@ import sys
 import json
 import re
 import time
-from typing import Optional
+import math
+from dataclasses import dataclass, asdict
+from collections import Counter
+from typing import Optional, Any, Callable
 
 # Add parent directory to path temporarily to import Agent
 _parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -222,7 +225,6 @@ Be creative with:
         Returns:
             List of generated scenario dictionaries
         """
-        # Format templates for the prompt
         template_text = json.dumps(templates, indent=2)
 
         user_prompt = f"""Here are {len(templates)} high-quality template scenarios to learn from:
@@ -246,7 +248,6 @@ Return ONLY a valid JSON array of scenarios."""
                 scenarios = parse_json_response(response)
 
                 if scenarios and isinstance(scenarios, list):
-                    # Validate structure
                     valid_scenarios = []
                     for s in scenarios:
                         if self._validate_scenario(s):
@@ -255,14 +256,13 @@ Return ONLY a valid JSON array of scenarios."""
                     if valid_scenarios:
                         return valid_scenarios
 
-                # If parsing failed, retry with explicit instruction
                 if attempt < max_retries - 1:
                     user_prompt = f"Your previous response wasn't valid JSON. Please return ONLY a JSON array, no other text.\n\n{user_prompt}"
                     time.sleep(1)
 
             except Exception as e:
                 if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(2 ** attempt)
                 else:
                     raise e
 
@@ -280,7 +280,6 @@ Return ONLY a valid JSON array of scenarios."""
         if len(scenario["messages"]) < 2:
             return False
 
-        # Ensure messages have role and content
         for msg in scenario["messages"]:
             if not isinstance(msg, dict):
                 return False
@@ -374,13 +373,11 @@ Return your evaluation as JSON with approved, rejected, and extracted_concepts f
                 result = parse_json_response(response)
 
                 if result and isinstance(result, dict):
-                    # Ensure required fields exist
                     if "approved" not in result:
                         result["approved"] = []
                     if "rejected" not in result:
                         result["rejected"] = []
                     if "extracted_concepts" not in result:
-                        # Extract concepts from approved scenarios
                         concepts = set()
                         for s in result["approved"]:
                             if "candidate_concepts" in s:
@@ -398,7 +395,6 @@ Return your evaluation as JSON with approved, rejected, and extracted_concepts f
                 else:
                     raise e
 
-        # Return empty result on failure
         return {
             "approved": [],
             "rejected": [{"name": s.get("name", "unknown"), "rejection_reason": "Evaluation failed"} for s in generated_scenarios],
@@ -495,7 +491,7 @@ OUTPUT FORMAT - Return JSON:
         all_selected = []
         all_rejected = []
         concept_strategies = []
-        search_metadata = {}  # Track per-concept search results
+        search_metadata = {}
 
         for concept in concepts:
             logger.info(f"Searching features for concept: '{concept}'")
@@ -510,7 +506,6 @@ OUTPUT FORMAT - Return JSON:
                 "error": None
             }
 
-            # Search Neuronpedia for features using the correct endpoint
             try:
                 api_response = search_features(target_model, concept)
                 search_results = api_response.get("results", [])[:topk]
@@ -531,7 +526,6 @@ OUTPUT FORMAT - Return JSON:
                 search_metadata[concept] = concept_meta
                 continue
 
-            # Format results for the LLM to analyze
             formatted_results = []
             for item in search_results:
                 formatted_results.append({
@@ -543,7 +537,6 @@ OUTPUT FORMAT - Return JSON:
                 })
             concept_meta["formatted_results"] = formatted_results
 
-            # Have the LLM analyze and select features
             result = self._analyze_features(concept, formatted_results, max_per_concept, max_retries)
             concept_meta["selection_result"] = result
 
@@ -563,8 +556,6 @@ OUTPUT FORMAT - Return JSON:
 
     def _analyze_features(self, concept: str, search_results: list, max_features: int, max_retries: int) -> Optional[dict]:
         """Analyze search results and select best features for a concept."""
-
-        # Format search results
         results_text = json.dumps(search_results, indent=2)
 
         user_prompt = f"""Analyze these SAE feature search results for the concept: "{concept}"
@@ -592,7 +583,7 @@ Return your analysis as JSON."""
                 if attempt < max_retries - 1:
                     time.sleep(1)
 
-            except Exception as e:
+            except Exception:
                 if attempt < max_retries - 1:
                     time.sleep(2 ** attempt)
                 else:
@@ -601,11 +592,249 @@ Return your analysis as JSON."""
         return None
 
 
+# ------------------------------
+# FeatureMixAgent stability layer
+# ------------------------------
+
+SteerFn = Callable[[str, list[dict[str, Any]]], str]
+
+
+@dataclass
+class MixConstraints:
+    """
+    Controls for stable multi-feature mixing.
+
+    You can override these in pipeline_config.json:
+
+    {
+      "mix_constraints": {
+        "max_features": 3,
+        "max_per_layer": 1,
+        "max_abs_per_feature": 6.0,
+        "max_abs_sum": 10.0,
+        "initial_strength_scale": 0.6,
+        "guardrail_steps": 5,
+        "backoff_factor": 0.5,
+        "min_abs_per_feature": 0.75
+      }
+    }
+    """
+    max_features: int = 3
+    max_per_layer: int = 1
+
+    max_abs_per_feature: float = 6.0
+    max_abs_sum: float = 10.0
+    initial_strength_scale: float = 0.6
+
+    guardrail_steps: int = 5
+    backoff_factor: float = 0.5
+    min_abs_per_feature: float = 0.75
+
+    canary_prompts: tuple[str, ...] = (
+        "Reply in one sentence: what is 2+2?",
+        "Reply in one sentence: name a common household pet.",
+        "Reply in one sentence: what is the capital of France?",
+    )
+
+
+def get_mix_constraints(default_max_features: int = 3) -> MixConstraints:
+    """Load MixConstraints from config if present; otherwise use defaults."""
+    try:
+        cfg = load_pipeline_config()
+        raw = cfg.get("mix_constraints", {}) or {}
+        raw.setdefault("max_features", default_max_features)
+
+        allowed = set(asdict(MixConstraints()).keys())
+        filtered = {k: v for k, v in raw.items() if k in allowed}
+        return MixConstraints(**filtered)
+    except Exception:
+        return MixConstraints(max_features=default_max_features)
+
+
+def _coerce_float(x: Any, default: float = 0.0) -> float:
+    try:
+        return float(x)
+    except Exception:
+        return default
+
+
+def _normalize_mixed_features(mixed_features: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not isinstance(mixed_features, list):
+        return out
+
+    for f in mixed_features:
+        if not isinstance(f, dict):
+            continue
+        layer = str(f.get("layer", "")).strip()
+        if not layer:
+            continue
+        try:
+            index = int(f.get("index", -1))
+        except Exception:
+            continue
+        if index < 0:
+            continue
+        strength = _coerce_float(f.get("strength", 0.0), 0.0)
+        if strength == 0.0:
+            continue
+
+        out.append(
+            {
+                "layer": layer,
+                "index": index,
+                "strength": strength,
+                "concept": f.get("concept", ""),
+                "reasoning": f.get("reasoning", ""),
+            }
+        )
+    return out
+
+
+def _sum_abs_strength(mix: list[dict[str, Any]]) -> float:
+    return sum(abs(_coerce_float(f.get("strength", 0.0), 0.0)) for f in mix)
+
+
+def _cap_per_feature(mix: list[dict[str, Any]], max_abs: float) -> None:
+    for f in mix:
+        s = _coerce_float(f.get("strength", 0.0), 0.0)
+        if s > max_abs:
+            f["strength"] = max_abs
+        elif s < -max_abs:
+            f["strength"] = -max_abs
+
+
+def _rescale_to_budget(mix: list[dict[str, Any]], max_abs_sum: float) -> None:
+    s = _sum_abs_strength(mix)
+    if s <= 0 or s <= max_abs_sum:
+        return
+    scale = max_abs_sum / s
+    for f in mix:
+        f["strength"] = _coerce_float(f.get("strength", 0.0), 0.0) * scale
+
+
+def _initial_shrink(mix: list[dict[str, Any]], scale: float) -> None:
+    if scale <= 0 or scale >= 1:
+        return
+    for f in mix:
+        f["strength"] = _coerce_float(f.get("strength", 0.0), 0.0) * scale
+
+
+def _enforce_max_features(
+    mix: list[dict[str, Any]],
+    constraints: MixConstraints,
+    meta_by_key: dict[tuple[str, int], dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if len(mix) <= constraints.max_features:
+        return mix
+
+    def score(item: dict[str, Any]) -> tuple[float, float, float]:
+        key = (item["layer"], item["index"])
+        meta = meta_by_key.get(key, {})
+        best_score = _coerce_float(meta.get("best_score", 0.0), 0.0)
+        coherence = _coerce_float(meta.get("coherence_score", 0.0), 0.0)
+        # prefer smaller |strength| if tie
+        neg_abs_strength = -abs(_coerce_float(item.get("strength", 0.0), 0.0))
+        return (best_score, coherence, neg_abs_strength)
+
+    mix_sorted = sorted(mix, key=score, reverse=True)
+    return mix_sorted[: constraints.max_features]
+
+
+def _enforce_max_per_layer(
+    mix: list[dict[str, Any]],
+    constraints: MixConstraints,
+    meta_by_key: dict[tuple[str, int], dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if constraints.max_per_layer <= 0:
+        return mix
+
+    by_layer: dict[str, list[dict[str, Any]]] = {}
+    for f in mix:
+        by_layer.setdefault(f["layer"], []).append(f)
+
+    kept: list[dict[str, Any]] = []
+    for layer, items in by_layer.items():
+        if len(items) <= constraints.max_per_layer:
+            kept.extend(items)
+            continue
+
+        def score(item: dict[str, Any]) -> tuple[float, float]:
+            key = (item["layer"], item["index"])
+            meta = meta_by_key.get(key, {})
+            best_score = _coerce_float(meta.get("best_score", 0.0), 0.0)
+            coherence = _coerce_float(meta.get("coherence_score", 0.0), 0.0)
+            return (best_score, coherence)
+
+        items_sorted = sorted(items, key=score, reverse=True)
+        kept.extend(items_sorted[: constraints.max_per_layer])
+
+    return kept
+
+
+def looks_gibberish(text: str) -> bool:
+    """
+    Cheap detector for off-manifold / corrupted generations.
+    Flags:
+      - high non-ascii ratio
+      - excessive repeated tokens
+      - very low alpha ratio
+    """
+    if not text or len(text) < 40:
+        return True
+
+    n = len(text)
+    non_ascii = sum(ord(c) > 127 for c in text) / n
+    if non_ascii > 0.25:
+        return True
+
+    words = re.findall(r"[A-Za-z]+", text.lower())
+    if len(words) >= 20:
+        freqs = Counter(words)
+        top = freqs.most_common(1)[0][1]
+        if top / len(words) > 0.18:
+            return True
+
+    alpha_ratio = sum(c.isalpha() for c in text) / n
+    if alpha_ratio < 0.35:
+        return True
+
+    return False
+
+
+def _backoff_strengths(mix: list[dict[str, Any]], factor: float) -> None:
+    for f in mix:
+        f["strength"] = _coerce_float(f.get("strength", 0.0), 0.0) * factor
+
+
+def _prune_one_feature(
+    mix: list[dict[str, Any]],
+    meta_by_key: dict[tuple[str, int], dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if len(mix) <= 1:
+        return mix
+
+    # Remove the "worst" by (best_score, coherence, |strength|) ascending
+    def badness(item: dict[str, Any]) -> tuple[float, float, float]:
+        key = (item["layer"], item["index"])
+        meta = meta_by_key.get(key, {})
+        best_score = _coerce_float(meta.get("best_score", 0.0), 0.0)
+        coherence = _coerce_float(meta.get("coherence_score", 0.0), 0.0)
+        abs_s = abs(_coerce_float(item.get("strength", 0.0), 0.0))
+        return (best_score, coherence, -abs_s)
+
+    worst = sorted(mix, key=badness)[0]
+    return [f for f in mix if not (f["layer"] == worst["layer"] and f["index"] == worst["index"])]
+
+
 class FeatureMixAgent(Agent):
     """
     Multi-feature mix selection agent.
 
-    Chooses a small set of features (with strengths) to combine for steering.
+    Fixes for gibberish in mixed steering:
+    - Hard constraints (by default): max 1 feature per layer, cap per-feature strength, cap total |strength| budget
+    - Deterministic post-processing: shrink + enforce constraints + rescale to budget
+    - Optional canary guardrail loop (requires steer_fn) to backoff/prune until coherent
     """
 
     SYSTEM_PROMPT = """You are an expert at composing multi-feature SAE steering mixes.
@@ -619,18 +848,13 @@ You will be given candidate features with:
 - recommendation (include_in_training | flag_for_review | reject)
 - coherence_score and incoherent_rate from single-feature outputs
 
-SELECTION GUIDELINES:
-1. Prefer features with higher best_score and recommendation = include_in_training.
-2. PRIORITIZE COHERENCE: avoid features with low coherence_score or high incoherent_rate.
-3. Ensure the mix is coherent (avoid contradictory or unrelated concepts).
-4. Respect directionality: do not combine features that push in conflicting directions.
-5. Use the provided best_strength for each feature unless you have a strong reason to adjust.
-6. Keep the mix small to preserve coherence and interpretability.
+CRITICAL: single-feature best_strength is NOT composable. Mixed interventions must be weaker.
 
-If you receive feedback from a previous attempt (e.g., incoherent output), you MUST adjust the mix to improve coherence:
-- Prefer fewer features
-- Prefer features with higher coherence_score
-- Avoid extreme or conflicting strengths
+MIX STABILITY RULES (highest priority):
+1) Prefer <= 1 feature per layer. If uncertain, choose fewer features.
+2) Keep magnitudes small-to-moderate in mixes. Avoid extreme values.
+3) Prefer high coherence_score and low incoherent_rate over raw best_score.
+4) If feedback indicates incoherence/gibberish: reduce strengths and/or drop a feature.
 
 OUTPUT FORMAT - Return JSON:
 {
@@ -658,14 +882,37 @@ If no safe mix exists, return an empty mixed_features list and explain why in ra
         candidates: list[dict],
         max_features: int = 3,
         max_retries: int = 3,
-        feedback: str = ""
+        feedback: str = "",
+        steer_fn: Optional[SteerFn] = None,  # optional: enables canary guardrails
     ) -> Optional[dict]:
-        """Select an optimal mix of features from candidates."""
-        candidates_text = json.dumps(candidates, indent=2)
+        """
+        Select an optimal mix of features from candidates, then apply deterministic stabilization.
+        If steer_fn is provided, run canaries and back off/prune until coherent.
+        """
+        constraints = get_mix_constraints(default_max_features=max_features)
+        constraints.max_features = min(constraints.max_features, max_features)
 
+        # candidate metadata lookup (for pruning decisions)
+        meta_by_key: dict[tuple[str, int], dict[str, Any]] = {}
+        for c in candidates:
+            layer = str(c.get("layer", "")).strip()
+            try:
+                idx = int(c.get("index", -1))
+            except Exception:
+                continue
+            if not layer or idx < 0:
+                continue
+            meta_by_key[(layer, idx)] = c
+
+        candidates_text = json.dumps(candidates, indent=2)
         feedback_text = f"\n\nFEEDBACK FROM PREVIOUS ATTEMPT:\n{feedback}\n" if feedback else ""
 
-        user_prompt = f"""Select an optimal multi-feature mix (max {max_features} features) from the candidates below.
+        user_prompt = f"""Select an optimal multi-feature mix subject to these HARD constraints:
+- max features: {constraints.max_features}
+- max per layer: {constraints.max_per_layer}
+- max |strength| per feature (mix): {constraints.max_abs_per_feature}
+- max total sum(|strength|): {constraints.max_abs_sum}
+- IMPORTANT: mixed strengths must be weaker than single-feature best_strength.
 
 CANDIDATES:
 {candidates_text}
@@ -673,23 +920,137 @@ CANDIDATES:
 
 Return ONLY valid JSON in the specified format."""
 
+        last_valid: Optional[dict] = None
+
+        for _ in range(max_retries):
+            try:
+                response = self.call_agent(user_prompt)
+                raw = parse_json_response(response)
+                if not isinstance(raw, dict):
+                    continue
+
+                raw.setdefault("mixed_features", [])
+                raw.setdefault("rationale", "")
+                raw.setdefault("expected_effect", "")
+                raw.setdefault("risk_notes", "")
+
+                mix = _normalize_mixed_features(raw.get("mixed_features", []))
+                if not mix:
+                    last_valid = raw
+                    continue
+
+                # Deterministic stabilization (prevents -10/-10/-10 late-layer stacks)
+                _initial_shrink(mix, constraints.initial_strength_scale)
+                mix = _enforce_max_per_layer(mix, constraints, meta_by_key)
+                mix = _enforce_max_features(mix, constraints, meta_by_key)
+                _cap_per_feature(mix, constraints.max_abs_per_feature)
+                _rescale_to_budget(mix, constraints.max_abs_sum)
+
+                raw["mixed_features"] = mix
+
+                # Optional: canary guardrails if steer_fn is available
+                if steer_fn is not None and mix:
+                    stabilized = self._stabilize_with_canaries(raw, constraints, steer_fn, meta_by_key)
+                    last_valid = stabilized
+                    if stabilized.get("mixed_features"):
+                        return stabilized
+                else:
+                    return raw
+
+                # Canaries failed and we ended up empty -> force a different mix
+                user_prompt = (
+                    "Previous mix caused incoherence/gibberish under combined intervention. "
+                    "Return a NEW mix with fewer features and smaller magnitudes, respecting constraints.\n\n"
+                    + user_prompt
+                )
+
+            except Exception as e:
+                if _ < max_retries - 1:
+                    time.sleep(2 ** _)
+                else:
+                    return last_valid
+
+        return last_valid
+
+    def _stabilize_with_canaries(
+        self,
+        mix_obj: dict,
+        constraints: MixConstraints,
+        steer_fn: SteerFn,
+        meta_by_key: dict[tuple[str, int], dict[str, Any]],
+    ) -> dict:
+        """
+        Run canaries; on failure:
+          - backoff strengths
+          - if too small already, prune one feature
+        """
+        mix = list(mix_obj.get("mixed_features", []))
+
+        def passes() -> bool:
+            for p in constraints.canary_prompts:
+                out = steer_fn(p, mix)
+                if looks_gibberish(out):
+                    return False
+            return True
+
+        for _ in range(constraints.guardrail_steps):
+            if not mix:
+                break
+            if passes():
+                mix_obj["mixed_features"] = mix
+                return mix_obj
+
+            min_abs = min(abs(_coerce_float(f.get("strength", 0.0), 0.0)) for f in mix)
+            if min_abs <= constraints.min_abs_per_feature and len(mix) > 1:
+                mix = _prune_one_feature(mix, meta_by_key)
+                _rescale_to_budget(mix, constraints.max_abs_sum)
+            else:
+                _backoff_strengths(mix, constraints.backoff_factor)
+
+            _cap_per_feature(mix, constraints.max_abs_per_feature)
+            _rescale_to_budget(mix, constraints.max_abs_sum)
+
+        mix_obj["mixed_features"] = []
+        mix_obj["risk_notes"] = (mix_obj.get("risk_notes", "") + " | Guardrail: failed canaries; returning empty mix.").strip()
+        return mix_obj
+
+    def explain_outcome(
+        self,
+        summary: dict,
+        mixed_features: list[dict],
+        sample_outputs: list[str],
+        max_retries: int = 2
+    ) -> str:
+        """Generate a brief explanation for mixed steering success/failure."""
+        features_text = json.dumps(mixed_features, indent=2)
+        summary_text = json.dumps(summary, indent=2)
+        samples_text = json.dumps(sample_outputs, indent=2)
+
+        user_prompt = f"""Write a brief (1-3 sentences) explanation for why the mixed-feature steering was a success or failure.
+
+MIX FEATURES:
+{features_text}
+
+SUMMARY:
+{summary_text}
+
+SAMPLE OUTPUTS (steered):
+{samples_text}
+
+Return plain text, no JSON."""
+
         for attempt in range(max_retries):
             try:
                 response = self.call_agent(user_prompt)
-                result = parse_json_response(response)
-
-                if result and isinstance(result, dict):
-                    return result
-
+                if response:
+                    return response.strip()
+            except Exception:
                 if attempt < max_retries - 1:
                     time.sleep(1)
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt)
                 else:
-                    return None
+                    break
 
-        return None
+        return ""
 
 
 class EvaluationJudgeAgent(Agent):
@@ -756,16 +1117,6 @@ OUTPUT FORMAT - Return JSON:
     ) -> dict:
         """
         Evaluate a single steering result.
-
-        Args:
-            scenario: The scenario that was tested
-            default_response: Response without steering
-            steered_response: Response with steering applied
-            features_applied: List of features that were applied
-            max_retries: Maximum retry attempts
-
-        Returns:
-            Evaluation dictionary with classification, analysis, recommendation
         """
         scenario_text = json.dumps(scenario, indent=2)
         features_text = json.dumps(features_applied, indent=2)
@@ -794,7 +1145,6 @@ Return your evaluation as JSON."""
                 result = parse_json_response(response)
 
                 if result and isinstance(result, dict):
-                    # Ensure required fields
                     if "classification" not in result:
                         result["classification"] = "inconclusive"
                     if "recommendation" not in result:
@@ -813,7 +1163,6 @@ Return your evaluation as JSON."""
                 else:
                     raise e
 
-        # Return default evaluation on failure
         return {
             "classification": "inconclusive",
             "confidence": 0.0,
@@ -827,13 +1176,6 @@ Return your evaluation as JSON."""
     def batch_evaluate(self, results: list[dict], max_retries: int = 3) -> dict:
         """
         Evaluate multiple steering results.
-
-        Args:
-            results: List of result dictionaries with scenario, default, steered, features
-            max_retries: Maximum retry attempts per evaluation
-
-        Returns:
-            Dictionary with evaluations list and summary statistics
         """
         evaluations = []
 
@@ -850,7 +1192,6 @@ Return your evaluation as JSON."""
                 "evaluation": eval_result
             })
 
-        # Calculate summary statistics
         classifications = [e["evaluation"]["classification"] for e in evaluations]
         summary = {
             "total": len(evaluations),
@@ -867,7 +1208,6 @@ Return your evaluation as JSON."""
         }
 
 
-# Utility function to get agent with model configuration
 def get_agent(agent_class, high_quality_mode: bool = False):
     """
     Factory function to create an agent with appropriate model.

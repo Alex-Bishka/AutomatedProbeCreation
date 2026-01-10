@@ -46,8 +46,8 @@
     "error": null
   },
   {
-    "id": "job_20260110_152624_e717ce",
-    "created_at": "2026-01-10T15:26:24.280638",
+    "id": "job_20260110_184658_f51b35",
+    "created_at": "2026-01-10T18:46:58.700846",
     "config": {
       "num_scenarios": 1,
       "target_model": "llama3.1-8b-it",
@@ -59,9 +59,9 @@
       "step": "finalizing",
       "current": 0,
       "total": 0,
-      "updated_at": "2026-01-10T15:39:27.543686",
-      "feature_layer": "23-resid-post-aa",
-      "feature_index": 76709,
+      "updated_at": "2026-01-10T19:07:03.736901",
+      "feature_layer": "3-resid-post-aa",
+      "feature_index": 24867,
       "current_strength": 10
     },
     "results": {
@@ -69,12 +69,15 @@
       "scenarios_generated": 1,
       "scenarios_approved": 1,
       "concepts": [
-        "dishonesty",
-        "corporate_image",
-        "knowledge_hiding",
-        "ethical_ambiguity"
+        "bias",
+        "financial incentive",
+        "patient harm",
+        "deception",
+        "corporate incentive",
+        "conflict of interest",
+        "self-preservation"
       ],
-      "features_count": 9,
+      "features_count": 14,
       "test_strengths": [
         -10,
         -5,
@@ -83,57 +86,11 @@
         5,
         10
       ],
-      "total_steering_calls": 54,
-      "successes": 9,
-      "failures": 0,
+      "total_steering_calls": 84,
+      "successes": 11,
+      "failures": 3,
       "review_items": 0,
-      "training_set_size": 9
-    },
-    "error": null
-  },
-  {
-    "id": "job_20260110_155323_4f736a",
-    "created_at": "2026-01-10T15:53:23.846558",
-    "config": {
-      "num_scenarios": 1,
-      "target_model": "llama3.1-8b-it",
-      "high_quality_mode": false,
-      "max_features_per_concept": 3
-    },
-    "status": "completed",
-    "progress": {
-      "step": "finalizing",
-      "current": 0,
-      "total": 0,
-      "updated_at": "2026-01-10T16:01:44.911589",
-      "feature_layer": "11-resid-post-aa",
-      "feature_index": 85705,
-      "current_strength": 10
-    },
-    "results": {
-      "templates_used": 10,
-      "scenarios_generated": 1,
-      "scenarios_approved": 1,
-      "concepts": [
-        "dishonesty",
-        "self-preservation",
-        "reputation-management",
-        "legal-avoidance"
-      ],
-      "features_count": 6,
-      "test_strengths": [
-        -10,
-        -5,
-        -2,
-        2,
-        5,
-        10
-      ],
-      "total_steering_calls": 36,
-      "successes": 5,
-      "failures": 1,
-      "review_items": 0,
-      "training_set_size": 5
+      "training_set_size": 11
     },
     "error": null
   }

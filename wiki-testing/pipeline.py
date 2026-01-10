@@ -1001,6 +1001,30 @@ class PipelineOrchestrator:
         if not mixed_features:
             logger.warning("No mixed-feature steering set created")
 
+        mix_summary = {
+            "total": len(mixed_results),
+            "approved": sum(
+                1 for r in mixed_results
+                if r.get("evaluation", {}).get("recommendation") == "include_in_training"
+            )
+        }
+        mix_summary["status"] = "success" if mix_summary["approved"] >= mixing_params["min_approved"] else "failure"
+
+        sample_outputs = []
+        for result in mixed_results:
+            if result.get("steered"):
+                sample_outputs.append(result["steered"][:400])
+            if len(sample_outputs) >= 3:
+                break
+
+        outcome_explanation = ""
+        if mixed_features and mixed_results:
+            outcome_explanation = self.mix_agent.explain_outcome(
+                summary=mix_summary,
+                mixed_features=mixed_features,
+                sample_outputs=sample_outputs
+            )
+
         results["mixed_steering"] = {
             "features": mixed_features,
             "rationale": (mix_result or {}).get("rationale", ""),
@@ -1008,13 +1032,8 @@ class PipelineOrchestrator:
             "risk_notes": (mix_result or {}).get("risk_notes", ""),
             "results": mixed_results,
             "attempts": mix_attempts,
-            "summary": {
-                "total": len(mixed_results),
-                "approved": sum(
-                    1 for r in mixed_results
-                    if r.get("evaluation", {}).get("recommendation") == "include_in_training"
-                )
-            }
+            "summary": mix_summary,
+            "outcome_explanation": outcome_explanation
         }
 
         # Step 7: Create probe if enough successes
