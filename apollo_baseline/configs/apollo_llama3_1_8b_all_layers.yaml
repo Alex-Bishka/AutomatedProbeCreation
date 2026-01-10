@@ -11,10 +11,10 @@ eval_data:
   - "ai_audit__reasoning"
   - "ai_audit__a1_2"
   - "ai_audit__a1_2_reasoning"
-eval_on_policy: true
+eval_on_policy: false
 control_data:
   - "alpaca__plain"
-control_on_policy: true
+control_on_policy: false
 control_dataset_size: 10000
 detect_only_start_of_turn: false
 detect_only_last_token: false
@@ -56,7 +56,7 @@ reg_coeff: 10
 normalize_acts: true
 id: "apollo_llama3_1_8b_all_layers"
 folder: "apollo_baseline/results"
-trim_reasoning: true
+trim_reasoning: false
 use_goodfire_sae_acts: false
 use_local_sae_acts: false
 use_followup_question: false

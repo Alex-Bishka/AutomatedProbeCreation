@@ -105,7 +105,8 @@ def run(
     config = ExperimentConfig(**config_dict)  # type: ignore[reportGeneralTypeIssues]
     try:
         experiment = Experiment(config)
-        save_detection_masks(experiment)
+        if os.getenv("APOLLO_SKIP_DETECTION_MASKS", "1") != "1":
+            save_detection_masks(experiment)
         experiment.get_detector()
     except Exception as err:
         for file_path in config.folder.iterdir():
