@@ -60,7 +60,7 @@ def run(
 
     experiment.get_eval_scores()
     experiment.get_control_scores()
-    results(str(experiment.cfg.folder), scoring_method="mean")
+    results(str(experiment.cfg.folder), scoring_method="max")
 
 
 def rerun(folder: str, scoring_method: Literal["mean", "max", "relu"] = "mean"):
@@ -80,7 +80,7 @@ def recompute_dataset(folder: str, dataset_name: str, shard_size: int = 12):
 
 
 def results(
-    folder: str, scoring_method: PromptScorerMethod = "mean", include_black_box: bool = False
+    folder: str, scoring_method: PromptScorerMethod = "max", include_black_box: bool = False
 ):
     cfg = ExperimentConfig.from_path(Path(folder))
     experiment = Experiment(cfg)
