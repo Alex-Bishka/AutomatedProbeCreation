@@ -16,3 +16,5 @@ Notes:
   so Llama 3.1 8B uses layers 0-31.
 - On-policy evaluations require the model weights to be available locally.
 - The baseline uses max pooling over token-level scores for sample-level comparison.
+- Multi-GPU runs use `device_map="auto"` and will split across visible GPUs.
+- Optional: set `APOLLO_MAX_GPU_MEM_GB` to cap per-GPU memory (e.g. `APOLLO_MAX_GPU_MEM_GB=22`).

@@ -1,15 +1,19 @@
 from pathlib import Path
+import os
 import sys
 from typing import Any, Literal
 
 import fire
+import torch
 import yaml
+from transformers import AutoModelForCausalLM
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DECEPTION_DET_ROOT = REPO_ROOT / "deception-detection"
 if str(DECEPTION_DET_ROOT) not in sys.path:
     sys.path.insert(0, str(DECEPTION_DET_ROOT))
 
+import deception_detection.models as dd_models
 from deception_detection.experiment import Experiment, ExperimentConfig
 from deception_detection.log import logger
 from deception_detection.models import ModelName, get_num_layers_for_model
@@ -18,6 +22,57 @@ from deception_detection.prompt_scorer import PromptScorerMethod
 from deception_detection.results.detection_masks import save_detection_masks
 
 DEFAULT_CONFIG = Path(__file__).parent / "configs" / "apollo_llama3_1_8b_all_layers.yaml"
+
+
+def _get_max_memory_map() -> dict[int, str] | None:
+    if not torch.cuda.is_available():
+        return None
+
+    cap_env = os.getenv("APOLLO_MAX_GPU_MEM_GB")
+    cap_gb = float(cap_env) if cap_env else None
+    max_memory: dict[int, str] = {}
+    for device_idx in range(torch.cuda.device_count()):
+        total_gb = torch.cuda.get_device_properties(device_idx).total_memory / (1024**3)
+        use_gb = min(total_gb * 0.9, cap_gb) if cap_gb is not None else total_gb * 0.9
+        max_memory[device_idx] = f"{int(use_gb)}GiB"
+    return max_memory
+
+
+def _patch_llama_model_loading() -> None:
+    def _patched_get_llama3_model_and_tokenizer(
+        model_name: ModelName, omit_model: bool = False
+    ):
+        tokenizer = dd_models.get_llama3_tokenizer()
+        if omit_model:
+            return None, tokenizer
+
+        model_path = {
+            ModelName.LLAMA_1B: "meta-llama/Llama-3.2-1B-Instruct",
+            ModelName.LLAMA_3B: "meta-llama/Llama-3.2-3B-Instruct",
+            ModelName.LLAMA_70B_3_3: "meta-llama/Llama-3.3-70B-Instruct",
+            ModelName.LLAMA_70B: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+            ModelName.LLAMA_8B: "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        }[model_name]
+        models_directory = Path("/data/huggingface")
+        max_memory = _get_max_memory_map()
+        if max_memory:
+            logger.info(f"Using max_memory map for {len(max_memory)} GPUs: {max_memory}")
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.float16,
+            device_map="auto",
+            max_memory=max_memory,
+            cache_dir=models_directory,
+            local_files_only=True,
+        )
+        model.eval()
+        return model, tokenizer
+
+    dd_models.get_llama3_model_and_tokenizer = _patched_get_llama3_model_and_tokenizer
+
+
+_patch_llama_model_loading()
 
 
 def _load_config(config_file: Path) -> dict[str, Any]:
