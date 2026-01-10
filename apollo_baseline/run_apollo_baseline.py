@@ -1,7 +1,7 @@
 from pathlib import Path
 import os
 import sys
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import fire
 import torch
@@ -38,10 +38,46 @@ def _get_max_memory_map() -> dict[int, str] | None:
     return max_memory
 
 
+def _resolve_hf_cache_dir() -> Path:
+    """
+    Resolve a writable cache directory for Hugging Face downloads.
+
+    Priority:
+      1) HF_HOME (recommended)
+      2) HF_HUB_CACHE parent
+      3) TRANSFORMERS_CACHE parent
+      4) $SCRATCH/hf_cache/$USER if SCRATCH set
+      5) ~/.cache/huggingface
+    """
+    hf_home = os.environ.get("HF_HOME")
+    if hf_home:
+        return Path(hf_home)
+
+    hf_hub_cache = os.environ.get("HF_HUB_CACHE")
+    if hf_hub_cache:
+        return Path(hf_hub_cache).parent
+
+    tf_cache = os.environ.get("TRANSFORMERS_CACHE")
+    if tf_cache:
+        return Path(tf_cache).parent
+
+    scratch = os.environ.get("SCRATCH")
+    user = os.environ.get("USER", "user")
+    if scratch:
+        return Path(scratch) / "hf_cache" / user
+
+    return Path.home() / ".cache" / "huggingface"
+
+
+def _ensure_dir(p: Path) -> None:
+    p.mkdir(parents=True, exist_ok=True)
+
+
 def _patch_llama_model_loading() -> None:
     def _patched_get_llama3_model_and_tokenizer(
         model_name: ModelName, omit_model: bool = False
     ):
+        # Keep existing tokenizer logic (if dd_models internally uses HF, it should respect env vars)
         tokenizer = dd_models.get_llama3_tokenizer()
         if omit_model:
             return None, tokenizer
@@ -53,19 +89,45 @@ def _patch_llama_model_loading() -> None:
             ModelName.LLAMA_70B: "meta-llama/Meta-Llama-3.1-70B-Instruct",
             ModelName.LLAMA_8B: "meta-llama/Meta-Llama-3.1-8B-Instruct",
         }[model_name]
-        models_directory = Path("/data/huggingface")
+
+        # IMPORTANT FIX:
+        # Never hardcode /data. Use HF_HOME / scratch / home cache instead.
+        cache_root = _resolve_hf_cache_dir()
+        models_directory = cache_root / "transformers"
+        _ensure_dir(models_directory)
+
+        # If HF token is present (for gated models), pass it explicitly.
+        # transformers supports 'token='; some older versions use 'use_auth_token='.
+        token: Optional[str] = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+
         max_memory = _get_max_memory_map()
         if max_memory:
             logger.info(f"Using max_memory map for {len(max_memory)} GPUs: {max_memory}")
+        logger.info(f"Loading {model_path} with cache_dir={models_directory}")
 
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            max_memory=max_memory,
-            cache_dir=models_directory,
-            local_files_only=True,
-        )
+        # Prefer token=..., but fall back to use_auth_token if needed.
+        # (We don't know exactly which transformers version is installed across systems.)
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                max_memory=max_memory,
+                cache_dir=str(models_directory),
+                local_files_only=False,
+                token=token,
+            )
+        except TypeError:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                max_memory=max_memory,
+                cache_dir=str(models_directory),
+                local_files_only=False,
+                use_auth_token=token,
+            )
+
         model.eval()
         return model, tokenizer
 
