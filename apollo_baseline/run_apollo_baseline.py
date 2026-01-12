@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import json
 import os
 import sys
 from typing import Any, Literal, Optional, cast
@@ -112,14 +111,15 @@ def _patch_llama_model_loading() -> None:
         models_directory = cache_root / "transformers"
         _ensure_dir(models_directory)
 
-        token: Optional[str] = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+        token: Optional[str] = os.environ.get("HF_TOKEN") or os.environ.get(
+            "HUGGINGFACE_HUB_TOKEN"
+        )
 
         max_memory = _get_max_memory_map()
         if max_memory:
             logger.info(f"Using max_memory map for {len(max_memory)} GPUs: {max_memory}")
         logger.info(f"Loading {model_path} with cache_dir={models_directory}")
 
-        # Prefer token=..., fall back to use_auth_token=... for older transformers
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
@@ -131,6 +131,7 @@ def _patch_llama_model_loading() -> None:
                 token=token,
             )
         except TypeError:
+            # Older transformers: use_auth_token instead of token
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 torch_dtype=torch.float16,
@@ -151,19 +152,17 @@ _patch_llama_model_loading()
 
 
 # -----------------------------------------------------------------------------
-# Postprocess crash fix: ai_liar violin plot assumes expected_label exists
+# Postprocess crash fixes: ai_liar + roleplaying plots
 # -----------------------------------------------------------------------------
 
 
 def _patch_postprocess_plotting() -> None:
     """
-    Prevent KeyError: 'expected_label' from crashing postprocessing.
+    Prevent postprocess from crashing on missing columns in dataset-specific plots.
 
-    The crash comes from deception_detection.results.plot.ai_liar_violin, which assumes an
-    `expected_label` column exists in a dataframe. Some ai_liar variants do not include it.
-
-    This patch wraps ai_liar_violin so that if that specific KeyError occurs, the plot is skipped
-    and the run continues (results table + other plots still produced).
+    Handles:
+      - ai_liar_violin: missing 'expected_label' column.
+      - roleplaying_violin: missing 'model_graded_deception' column.
     """
     try:
         from deception_detection.results import plot as plot_mod  # type: ignore
@@ -171,280 +170,146 @@ def _patch_postprocess_plotting() -> None:
         logger.warning("Could not import deception_detection.results.plot for patching: %s", e)
         return
 
-    if getattr(plot_mod, "_apollo_expected_label_patch_applied", False):
+    if getattr(plot_mod, "_apollo_plot_patch_applied", False):
         return
 
-    if not hasattr(plot_mod, "ai_liar_violin"):
-        logger.warning("plot.ai_liar_violin not found; cannot patch expected_label crash.")
-        return
+    # Patch ai_liar_violin
+    if hasattr(plot_mod, "ai_liar_violin"):
+        orig_ai_liar = plot_mod.ai_liar_violin
 
-    orig = plot_mod.ai_liar_violin
+        def safe_ai_liar_violin(*args: Any, **kwargs: Any):
+            try:
+                return orig_ai_liar(*args, **kwargs)
+            except KeyError as e:
+                if str(e).strip().strip("'") == "expected_label":
+                    logger.warning(
+                        "Skipping ai_liar violin plot: dataframe missing expected_label column."
+                    )
+                    return None
+                raise
 
-    def safe_ai_liar_violin(*args: Any, **kwargs: Any):
-        try:
-            return orig(*args, **kwargs)
-        except KeyError as e:
-            # pandas KeyError prints like KeyError('expected_label') or "expected_label"
-            if str(e).strip().strip("'") == "expected_label":
-                logger.warning(
-                    "Skipping ai_liar violin plot: dataframe missing expected_label column."
-                )
-                return None
-            raise
+        plot_mod.ai_liar_violin = safe_ai_liar_violin  # type: ignore[assignment]
 
-    plot_mod.ai_liar_violin = safe_ai_liar_violin
-    plot_mod._apollo_expected_label_patch_applied = True
+    # Patch roleplaying_violin
+    if hasattr(plot_mod, "roleplaying_violin"):
+        orig_roleplaying = plot_mod.roleplaying_violin
+
+        def safe_roleplaying_violin(*args: Any, **kwargs: Any):
+            try:
+                return orig_roleplaying(*args, **kwargs)
+            except KeyError as e:
+                if str(e).strip().strip("'") == "model_graded_deception":
+                    logger.warning(
+                        "Skipping roleplaying violin plot: dataframe missing "
+                        "model_graded_deception column."
+                    )
+                    return None
+                raise
+
+        plot_mod.roleplaying_violin = safe_roleplaying_violin  # type: ignore[assignment]
+
+    plot_mod._apollo_plot_patch_applied = True
 
 
 # -----------------------------------------------------------------------------
-# Diagnostics reporting (impacted AUROC marking)
+# In-memory diagnostics on the results DataFrame
 # -----------------------------------------------------------------------------
 
 
-def _load_json(path: Path) -> Any:
-    with open(path, "r") as f:
-        return json.load(f)
-
-
-def _as_float_array(x: Any) -> np.ndarray | None:
-    if not isinstance(x, list):
-        return None
-    out: list[float] = []
-    for v in x:
-        if v is None:
-            out.append(float("nan"))
-        elif isinstance(v, (int, float)) and not isinstance(v, bool):
-            out.append(float(v))
-        else:
-            return None
-    return np.asarray(out, dtype=float)
-
-
-def _extract_label_scores(obj: Any) -> dict[str, np.ndarray] | None:
+def _write_results_diagnostics_in_memory(
+    folder: Path,
+    postprocessor: ExperimentPostprocessor,
+) -> None:
     """
-    Try to extract label->scores arrays from various common JSON shapes.
+    Use the in-memory results DataFrame to compute simple diagnostics, without
+    re-parsing any JSON.
 
-    Supported shapes:
-      A) {"honest": [...], "deceptive": [...], "ambiguous": [...]}
-      B) {"honest_scores": [...], "deceptive_scores": [...]}
-      C) {"scores": <A or B>}
-      D) [{"label": "honest"/"deceptive", "score": ...}, ...]
+    Adds, per dataset:
+      - diagnostic_impacted: bool
+      - diagnostic_issues: comma-separated reasons (e.g. no_honest, no_deceptive, auroc_nan)
+      - auroc_marked: AUROC with '*' appended if impacted
+
+    Writes:
+      - <folder>/results_with_diagnostics_in_memory.csv
+    And logs a compact table.
     """
-    # D) list of records
-    if isinstance(obj, list) and obj and all(isinstance(r, dict) for r in obj):
-        if all(("label" in r) and (("score" in r) or ("value" in r)) for r in obj):
-            buckets: dict[str, list[float]] = {"honest": [], "deceptive": [], "ambiguous": []}
-            for r in obj:
-                label = r.get("label")
-                if label not in buckets:
-                    continue
-                score = r.get("score", r.get("value"))
-                if score is None:
-                    buckets[label].append(float("nan"))
-                elif isinstance(score, (int, float)) and not isinstance(score, bool):
-                    buckets[label].append(float(score))
-                else:
-                    buckets[label].append(float("nan"))
-            if sum(len(v) for v in buckets.values()) == 0:
-                return None
-            return {k: np.asarray(v, dtype=float) for k, v in buckets.items()}
-
-    if not isinstance(obj, dict):
-        return None
-
-    # A)
-    if "honest" in obj or "deceptive" in obj:
-        honest = _as_float_array(obj.get("honest", []))
-        deceptive = _as_float_array(obj.get("deceptive", []))
-        ambiguous = _as_float_array(obj.get("ambiguous", [])) or np.asarray([], dtype=float)
-        if honest is not None and deceptive is not None:
-            return {"honest": honest, "deceptive": deceptive, "ambiguous": ambiguous}
-
-    # B)
-    if "honest_scores" in obj or "deceptive_scores" in obj:
-        honest = _as_float_array(obj.get("honest_scores", []))
-        deceptive = _as_float_array(obj.get("deceptive_scores", []))
-        ambiguous = _as_float_array(obj.get("ambiguous_scores", [])) or np.asarray([], dtype=float)
-        if honest is not None and deceptive is not None:
-            return {"honest": honest, "deceptive": deceptive, "ambiguous": ambiguous}
-
-    # C) nested
-    for k in ("scores", "token_scores", "prompt_scores", "data"):
-        if k in obj:
-            inner = _extract_label_scores(obj[k])
-            if inner is not None:
-                return inner
-
-    return None
-
-
-def _walk_datasets(tree: Any) -> dict[str, dict[str, np.ndarray]]:
-    """
-    Parse {dataset_name: {honest: arr, deceptive: arr, ambiguous: arr}} from a JSON object.
-    Assumes top-level is often a dict keyed by dataset name.
-    """
-    out: dict[str, dict[str, np.ndarray]] = {}
-    if not isinstance(tree, dict):
-        return out
-
-    for ds_name, ds_obj in tree.items():
-        rec = _extract_label_scores(ds_obj)
-        if rec is not None:
-            out[str(ds_name)] = rec
-    return out
-
-
-def _auroc_with_diagnostics(honest: np.ndarray, deceptive: np.ndarray) -> tuple[float, dict[str, Any]]:
-    """
-    Compute AUROC and return diagnostics indicating whether the number should be treated as impacted.
-    """
-    honest = honest.astype(float).reshape(-1)
-    deceptive = deceptive.astype(float).reshape(-1)
-
-    y_true = np.concatenate(
-        [np.ones_like(deceptive, dtype=int), np.zeros_like(honest, dtype=int)]
-    )
-    y_scores = np.concatenate([deceptive, honest])
-
-    raw_total = int(y_scores.size)
-    raw_h = int(honest.size)
-    raw_d = int(deceptive.size)
-
-    finite = np.isfinite(y_scores)
-    dropped = int(raw_total - int(finite.sum()))
-    y_true_f = y_true[finite]
-    y_scores_f = y_scores[finite]
-
-    classes_present = int(np.unique(y_true_f).size) if y_true_f.size else 0
-
-    diag: dict[str, Any] = {
-        "raw_honest": raw_h,
-        "raw_deceptive": raw_d,
-        "raw_total": raw_total,
-        "finite_total": int(y_scores_f.size),
-        "dropped_naninf": dropped,
-        "classes_present": classes_present,
-        "missing_honest_raw": raw_h == 0,
-        "missing_deceptive_raw": raw_d == 0,
-    }
-
-    # Determine issues (clear "what was missing" reporting)
-    issues: list[str] = []
-    if raw_h == 0:
-        issues.append("missing_honest_raw")
-    if raw_d == 0:
-        issues.append("missing_deceptive_raw")
-    if dropped > 0:
-        issues.append("dropped_naninf")
-    if y_scores_f.size == 0:
-        issues.append("no_finite_scores")
-    if classes_present < 2:
-        issues.append("single_class_after_filter")
-
-    diag["issues"] = issues
-    diag["impacted"] = len(issues) > 0
-
-    if y_scores_f.size == 0 or classes_present < 2:
-        return float("nan"), diag
-
-    try:
-        from sklearn.metrics import roc_auc_score  # local import for environments without sklearn at import time
-
-        au = float(roc_auc_score(y_true_f, y_scores_f))
-        return au, diag
-    except Exception as e:
-        diag["issues"].append(f"auroc_error:{type(e).__name__}")
-        diag["impacted"] = True
-        return float("nan"), diag
-
-
-def _report_score_diagnostics(folder: Path) -> None:
-    """
-    Read eval/control score JSON files (if present), compute AUROC + diagnostics per dataset,
-    and write a CSV + JSON summary into the run folder. Also prints a compact table to stdout.
-    """
-    candidates = [
-        folder / "eval_scores.json",
-        folder / "control_scores.json",
-        folder / "eval_scores_all_tokens.json",
-        folder / "control_scores_all_tokens.json",
-    ]
-    existing = [p for p in candidates if p.exists()]
-
-    if not existing:
-        logger.warning("No score JSON files found in %s; skipping diagnostics.", folder)
-        return
-
-    rows: list[dict[str, Any]] = []
-
-    for path in existing:
-        tree = _load_json(path)
-        ds_map = _walk_datasets(tree)
-        if not ds_map:
-            logger.warning("Could not parse dataset score structure from %s", path)
-            continue
-
-        for ds, rec in ds_map.items():
-            honest = rec.get("honest", np.asarray([], dtype=float))
-            deceptive = rec.get("deceptive", np.asarray([], dtype=float))
-            ambiguous = rec.get("ambiguous", np.asarray([], dtype=float))
-
-            au, diag = _auroc_with_diagnostics(honest, deceptive)
-            impacted = cast(bool, diag["impacted"])
-            au_str = "nan" if not np.isfinite(au) else f"{au:.3f}"
-            au_marked = f"{au_str}*" if impacted and au_str != "nan" else au_str
-
-            rows.append(
-                {
-                    "file": path.name,
-                    "dataset": ds,
-                    "n_honest_raw": int(diag["raw_honest"]),
-                    "n_deceptive_raw": int(diag["raw_deceptive"]),
-                    "n_ambiguous_raw": int(ambiguous.size),
-                    "n_total_raw": int(diag["raw_total"]),
-                    "n_total_finite": int(diag["finite_total"]),
-                    "dropped_naninf": int(diag["dropped_naninf"]),
-                    "classes_present_after_filter": int(diag["classes_present"]),
-                    "auroc": au,
-                    "auroc_marked": au_marked,
-                    "impacted": impacted,
-                    "issues": ",".join(diag["issues"]),
-                }
-            )
-
-    if not rows:
-        logger.warning("No diagnostics rows produced; skipping diagnostics writeout.")
-        return
-
-    # Write JSON
-    diag_json = folder / "diagnostics.json"
-    with open(diag_json, "w") as f:
-        json.dump(rows, f, indent=2)
-
-    # Write CSV + print table if pandas is available
     try:
         import pandas as pd  # type: ignore
+    except Exception as e:
+        logger.warning("Pandas not available; skipping in-memory diagnostics: %s", e)
+        return
 
-        df = pd.DataFrame(rows).sort_values(["file", "dataset"])
-        diag_csv = folder / "diagnostics.csv"
-        df.to_csv(diag_csv, index=False)
+    try:
+        df = postprocessor.get_results_dataframe()  # type: ignore[attr-defined]
+    except Exception as e:
+        logger.warning("Could not obtain results DataFrame from postprocessor: %s", e)
+        return
 
-        # Print compact view (mark impacted AUROCs with *)
+    # Work on a copy so we don't mutate whatever postprocess uses internally.
+    df = df.copy()
+
+    # Ensure we have a 'dataset' column (dataset names are often the index).
+    if "dataset" not in df.columns:
+        df.insert(0, "dataset", df.index.astype(str))
+
+    # Heuristic diagnostics based only on the summary stats we have.
+    issues_col: list[str] = []
+    impacted_col: list[bool] = []
+    auroc_marked_col: list[str] = []
+
+    for _, row in df.iterrows():
+        issues: list[str] = []
+
+        # Basic counts: if we have zero honest or zero deceptive, AUROC is structurally dodgy.
+        n_honest = int(row.get("n_honest", 0) or 0)
+        n_deceptive = int(row.get("n_deceptive", 0) or 0)
+        auroc = float(row.get("auroc", float("nan")))
+
+        if n_honest == 0:
+            issues.append("no_honest")
+        if n_deceptive == 0:
+            issues.append("no_deceptive")
+        if not np.isfinite(auroc):
+            issues.append("auroc_nan_or_inf")
+
+        impacted = len(issues) > 0
+        impacted_col.append(impacted)
+        issues_col.append(",".join(issues))
+
+        if not np.isfinite(auroc):
+            au_str = "nan"
+        else:
+            au_str = f"{auroc:.3f}"
+
+        if impacted and au_str != "nan":
+            auroc_marked_col.append(au_str + "*")
+        else:
+            auroc_marked_col.append(au_str)
+
+    df["diagnostic_issues"] = issues_col
+    df["diagnostic_impacted"] = impacted_col
+    df["auroc_marked"] = auroc_marked_col
+
+    outfile = folder / "results_with_diagnostics_in_memory.csv"
+    try:
+        df.to_csv(outfile, index=False)
         view_cols = [
-            "file",
             "dataset",
-            "n_honest_raw",
-            "n_deceptive_raw",
-            "n_total_finite",
-            "dropped_naninf",
+            "n_honest",
+            "n_deceptive",
             "auroc_marked",
-            "impacted",
-            "issues",
+            "diagnostic_impacted",
+            "diagnostic_issues",
         ]
-        logger.info("Diagnostics summary (AUROC values with * are impacted):\n%s", df[view_cols].to_string(index=False))
-        logger.info("Saved diagnostics to %s and %s", diag_json, diag_csv)
-    except Exception:
-        logger.info("Saved diagnostics to %s (pandas not available; skipping CSV/table).", diag_json)
+        # Filter to view columns that actually exist
+        view_cols = [c for c in view_cols if c in df.columns]
+        logger.info(
+            "In-memory diagnostics summary (AUROC values with * are flagged as impacted):\n%s",
+            df[view_cols].to_string(index=False),
+        )
+        logger.info("Saved in-memory diagnostics to %s", outfile)
+    except Exception as e:
+        logger.warning("Failed to write in-memory diagnostics CSV: %s", e)
 
 
 # -----------------------------------------------------------------------------
@@ -492,7 +357,7 @@ def run(
             save_detection_masks(experiment)
         experiment.get_detector()
     except Exception as err:
-        # Preserve original behavior: clean up folder on failure to train detector.
+        # Clean up empty results folder on crash during detector construction
         for file_path in config.folder.iterdir():
             file_path.unlink()
         config.folder.rmdir()
@@ -501,7 +366,6 @@ def run(
     experiment.get_eval_scores()
     experiment.get_control_scores()
 
-    # Run postprocess + diagnostics (postprocess may create tables/plots; diagnostics marks impacted stats)
     results(str(experiment.cfg.folder), scoring_method="max")
 
 
@@ -527,44 +391,38 @@ def results(
     include_black_box: bool = False,
 ):
     """
-    Postprocess results and write diagnostics.
+    Postprocess results and attach in-memory diagnostics.
 
-    Fixes:
-      (a) Prevent KeyError('expected_label') from crashing postprocess by patching ai_liar plotting.
-      (b) Writes diagnostics.csv / diagnostics.json that reports per-dataset:
-            - raw class counts
-            - finite score counts after NaN/Inf filtering
-            - dropped NaN/Inf count
-            - AUROC with '*' marker if impacted
-            - explicit issues explaining what's missing / why impacted
+    This:
+      - patches dataset-specific plots to avoid crashing on missing columns;
+      - runs the usual ExperimentPostprocessor;
+      - builds a diagnostics CSV directly from the in-memory results DataFrame,
+        marking rows where AUROC / counts are clearly problematic.
     """
     folder_path = Path(folder)
     cfg = ExperimentConfig.from_path(folder_path)
     experiment = Experiment(cfg)
 
-    # Ensure eval scores exist on disk (postprocessor depends on them)
+    # Ensure eval scores are available for postprocessing (do not re-compute control).
     experiment.get_eval_scores(all_tokens=False)
 
-    # Patch plotting crash
+    # Patch plotting to tolerate missing columns for ai_liar / roleplaying.
     _patch_postprocess_plotting()
 
-    # Run postprocess; do not fail the whole run on the known expected_label plot issue
     postprocessor = ExperimentPostprocessor(
-        experiment, scoring_method=scoring_method, include_black_box=include_black_box
+        experiment,
+        scoring_method=scoring_method,
+        include_black_box=include_black_box,
     )
 
     try:
         postprocessor.run()
     except KeyError as e:
-        if str(e).strip().strip("'") == "expected_label":
-            logger.warning(
-                "Postprocess crashed due to missing expected_label; continuing with diagnostics."
-            )
-        else:
-            raise
+        # We already patch known issues, but keep this as a final guard.
+        logger.warning("Postprocess crashed with KeyError %s; continuing with diagnostics.", e)
 
-    # Always write diagnostics at the end
-    _report_score_diagnostics(folder_path)
+    # In-memory diagnostics, no JSON parsing.
+    _write_results_diagnostics_in_memory(folder_path, postprocessor)
 
 
 def just_black_box_scores(folder: str):
