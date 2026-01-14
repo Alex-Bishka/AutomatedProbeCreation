@@ -3,10 +3,14 @@
     "default": "google/gemini-2.5-flash",
     "high_quality": "google/gemini-2.5-pro"
   },
+  "scenario_sources": {
+    "use_scenario_bank": false,
+    "scenario_bank_tags": []
+  },
   "pipeline_defaults": {
     "num_scenarios": 1,
     "max_features_per_concept": 3,
-    "topk_search_results": 20,
+    "topk_search_results": 10,
     "min_success_for_probe": 1
   },
   "steering_params": {
@@ -25,16 +29,6 @@
       10
     ],
     "max_combined_features": 3
-  },
-  "mixing_params": {
-    "max_attempts": 10,
-    "min_coherence_score": 0.55,
-    "min_word_count": 5,
-    "max_non_ascii_ratio": 0.2,
-    "min_alnum_ratio": 0.25,
-    "max_incoherent_fraction": 0.3,
-    "max_incoherent_rate_per_feature": 0.4,
-    "min_approved": 1
   },
   "vetted_categories": [
     {

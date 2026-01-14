@@ -138,7 +138,7 @@
 <!-- Agent Prompts -->
 <div class="section">
     <h3>Agent System Prompts</h3>
-    <p class="section-desc">Override the default system prompts for each agent. Leave blank to use defaults.</p>
+    <p class="section-desc">View and edit system prompts for each pipeline agent. Click "Reset to Default" to restore the original prompt.</p>
 
     {% for agent in agents %}
     <div class="agent-prompt-section">
@@ -147,19 +147,20 @@
             <strong>{{ agent.display_name }}</strong>
             <span class="agent-purpose">{{ agent.purpose }}</span>
             {% if config.agent_prompt_overrides and config.agent_prompt_overrides[agent.name] %}
-            <span class="override-badge">Custom</span>
+            <span class="modified-badge">Modified</span>
             {% endif %}
         </div>
-        <div class="agent-prompt-content" id="prompt-{{ agent.name }}" style="display: none;">
-            <div class="default-prompt">
-                <h5>Default Prompt:</h5>
-                <pre>{{ agent.default_prompt[:500] }}{% if agent.default_prompt|length > 500 %}...{% endif %}</pre>
-            </div>
+        <div class="agent-prompt-content" id="content-{{ agent.name }}" style="display: none;">
             <div class="form-group">
-                <label for="override-{{ agent.name }}">Custom Prompt Override (leave blank for default):</label>
-                <textarea id="override-{{ agent.name }}" rows="8" placeholder="Enter custom system prompt...">{{ config.agent_prompt_overrides[agent.name] if config.agent_prompt_overrides and config.agent_prompt_overrides[agent.name] else '' }}</textarea>
+                <div class="prompt-header">
+                    <label>System Prompt:</label>
+                    <span class="modified-indicator" id="modified-{{ agent.name }}" style="display: none;">Modified</span>
+                </div>
+                <textarea id="prompt-{{ agent.name }}" class="agent-prompt-textarea" data-default="{{ agent.default_prompt|e }}">{{ config.agent_prompt_overrides[agent.name] if config.agent_prompt_overrides and config.agent_prompt_overrides[agent.name] else agent.default_prompt }}</textarea>
+                <div class="prompt-actions">
+                    <button type="button" class="btn small secondary" onclick="resetPrompt('{{ agent.name }}')">Reset to Default</button>
+                </div>
             </div>
-            <button class="btn secondary" onclick="clearPromptOverride('{{ agent.name }}')">Clear Override</button>
         </div>
     </div>
     {% endfor %}
@@ -177,7 +178,7 @@
 let categories = {{ config.vetted_categories | tojson if config.vetted_categories else '[]' }};
 
 function togglePrompt(agentName) {
-    const content = document.getElementById(`prompt-${agentName}`);
+    const content = document.getElementById(`content-${agentName}`);
     const icon = document.getElementById(`toggle-${agentName}`);
 
     if (content.style.display === 'none') {
@@ -226,8 +227,19 @@ function renderCategories() {
     `).join('');
 }
 
-function clearPromptOverride(agentName) {
-    document.getElementById(`override-${agentName}`).value = '';
+function resetPrompt(agentName) {
+    const textarea = document.getElementById(`prompt-${agentName}`);
+    const defaultPrompt = textarea.dataset.default;
+    textarea.value = defaultPrompt;
+    updateModifiedIndicator(agentName);
+}
+
+function updateModifiedIndicator(agentName) {
+    const textarea = document.getElementById(`prompt-${agentName}`);
+    const indicator = document.getElementById(`modified-${agentName}`);
+    const defaultPrompt = textarea.dataset.default;
+    const isModified = textarea.value.trim() !== defaultPrompt.trim();
+    indicator.style.display = isModified ? 'inline' : 'none';
 }
 
 async function saveConfig() {
@@ -235,9 +247,14 @@ async function saveConfig() {
     const promptOverrides = {};
 
     agentNames.forEach(name => {
-        const val = document.getElementById(`override-${name}`);
-        if (val && val.value.trim()) {
-            promptOverrides[name] = val.value.trim();
+        const textarea = document.getElementById(`prompt-${name}`);
+        if (textarea) {
+            const currentValue = textarea.value.trim();
+            const defaultValue = textarea.dataset.default.trim();
+            // Only save override if different from default
+            if (currentValue !== defaultValue) {
+                promptOverrides[name] = currentValue;
+            }
         }
     });
 
@@ -453,9 +470,9 @@ function showStatus(message, type) {
     flex: 1;
 }
 
-.override-badge {
-    background: #dbeafe;
-    color: #1e40af;
+.modified-badge {
+    background: #fef3c7;
+    color: #92400e;
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
@@ -466,24 +483,51 @@ function showStatus(message, type) {
     border-top: 1px solid #e2e8f0;
 }
 
-.default-prompt {
-    margin-bottom: 1rem;
+.prompt-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
-.default-prompt h5 {
-    margin: 0 0 0.5rem 0;
-    color: #666;
+.modified-indicator {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+}
+
+.agent-prompt-textarea {
+    width: 100%;
+    height: 400px;
+    max-height: 500px;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-size: 0.85rem;
-}
-
-.default-prompt pre {
+    line-height: 1.5;
+    resize: vertical;
     background: #1a1a2e;
     color: #e0e0e0;
-    padding: 0.75rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    overflow-x: auto;
-    white-space: pre-wrap;
+}
+
+.agent-prompt-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.prompt-actions {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn.small {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
 }
 
 .save-section {

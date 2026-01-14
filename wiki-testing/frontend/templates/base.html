@@ -27,6 +27,8 @@
                     <span class="nav-section">Automated</span>
                     <a href="{{ url_for('pipeline_page') }}" {% if request.endpoint in ['pipeline_page', 'job_detail_page'] %}class="active"{% endif %}>Pipeline</a>
                     <a href="{{ url_for('review_page') }}" {% if request.endpoint == 'review_page' %}class="active"{% endif %}>Review</a>
+                    <a href="{{ url_for('scenario_bank_page') }}" {% if request.endpoint == 'scenario_bank_page' %}class="active"{% endif %}>Scenario Bank</a>
+                    <a href="{{ url_for('training_data_page') }}" {% if request.endpoint == 'training_data_page' %}class="active"{% endif %}>Training Data</a>
                     <a href="{{ url_for('probes_page') }}" {% if request.endpoint == 'probes_page' %}class="active"{% endif %}>Probes</a>
                     <a href="{{ url_for('config_page') }}" {% if request.endpoint == 'config_page' %}class="active"{% endif %}>Config</a>
                 </div>

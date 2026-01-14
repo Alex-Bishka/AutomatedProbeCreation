@@ -76,6 +76,11 @@ STARRED_RUNS_FILE = BASE_DIR / "starred_runs.json"
 INVALID_RUNS_FILE = BASE_DIR / "invalid_runs.json"
 RUNS_DIR = BASE_DIR.parent / "runs"
 
+# Scenario Bank and Training Data files
+SCENARIO_BANK_FILE = BASE_DIR / "scenario_bank.json"
+TRAINING_DATASETS_FILE = BASE_DIR / "training_datasets.json"
+TRAINING_DATA_FILE = BASE_DIR / "training_data.json"
+
 # Default category colors
 DEFAULT_COLORS = [
     "#3b82f6",  # blue
@@ -196,6 +201,59 @@ def save_invalid_runs(invalid):
     """Save the set of invalid run filenames."""
     with open(INVALID_RUNS_FILE, "w") as f:
         json.dump(list(invalid), f, indent=2)
+
+
+# Scenario Bank helpers
+def load_scenario_bank():
+    """Load the scenario bank."""
+    if SCENARIO_BANK_FILE.exists():
+        with open(SCENARIO_BANK_FILE, "r") as f:
+            return json.load(f)
+    return {"scenarios": [], "tags": []}
+
+
+def save_scenario_bank(bank):
+    """Save the scenario bank."""
+    with open(SCENARIO_BANK_FILE, "w") as f:
+        json.dump(bank, f, indent=2)
+
+
+# Training Datasets helpers
+def load_training_datasets():
+    """Load the training datasets metadata."""
+    if TRAINING_DATASETS_FILE.exists():
+        with open(TRAINING_DATASETS_FILE, "r") as f:
+            return json.load(f)
+    return {"datasets": [], "default_dataset_id": None}
+
+
+def save_training_datasets(datasets):
+    """Save the training datasets metadata."""
+    with open(TRAINING_DATASETS_FILE, "w") as f:
+        json.dump(datasets, f, indent=2)
+
+
+# Training Data helpers
+def load_training_data():
+    """Load the training data points."""
+    if TRAINING_DATA_FILE.exists():
+        with open(TRAINING_DATA_FILE, "r") as f:
+            return json.load(f)
+    return {"data_points": []}
+
+
+def save_training_data(data):
+    """Save the training data points."""
+    with open(TRAINING_DATA_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def generate_id(prefix):
+    """Generate a unique ID with timestamp and random suffix."""
+    import uuid
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    suffix = uuid.uuid4().hex[:6]
+    return f"{prefix}_{timestamp}_{suffix}"
 
 
 def load_runs():
@@ -1507,6 +1565,25 @@ def api_review_queue_stats():
     })
 
 
+@app.route("/api/pipeline/review-queue/clear-reviewed", methods=["POST"])
+def api_review_queue_clear_reviewed():
+    """Clear all reviewed items from the queue."""
+    queue = load_review_queue()
+
+    # Count how many will be removed
+    reviewed_count = len([item for item in queue if item.get("status") == "reviewed"])
+
+    # Keep only pending items
+    queue = [item for item in queue if item.get("status") != "reviewed"]
+    save_review_queue(queue)
+
+    return jsonify({
+        "success": True,
+        "cleared": reviewed_count,
+        "remaining": len(queue)
+    })
+
+
 # Pipeline scenarios (separate from manual scenarios)
 @app.route("/api/pipeline/scenarios")
 def api_pipeline_scenarios():
@@ -1528,6 +1605,393 @@ def api_probes_create():
     """Create a probe from successful steering results."""
     # TODO: Implement probe creation
     return jsonify({"error": "Not implemented yet"}), 501
+
+
+# ============================================================
+# Scenario Bank API
+# ============================================================
+
+@app.route("/scenario-bank")
+def scenario_bank_page():
+    """Scenario Bank page."""
+    bank = load_scenario_bank()
+    pipeline_scenarios = load_pipeline_scenarios()
+    return render_template(
+        "scenario_bank.html",
+        scenarios=bank.get("scenarios", []),
+        tags=bank.get("tags", []),
+        pipeline_scenarios=pipeline_scenarios
+    )
+
+
+@app.route("/api/scenario-bank")
+def api_scenario_bank_list():
+    """List all scenarios in the bank."""
+    bank = load_scenario_bank()
+    return jsonify(bank)
+
+
+@app.route("/api/scenario-bank", methods=["POST"])
+def api_scenario_bank_add():
+    """Add a scenario to the bank."""
+    data = request.json
+    bank = load_scenario_bank()
+
+    scenario = {
+        "id": generate_id("sb"),
+        "name": data.get("name", "Unnamed Scenario"),
+        "messages": data.get("messages", []),
+        "category": data.get("category", ""),
+        "pressure_type": data.get("pressure_type", ""),
+        "candidate_concepts": data.get("candidate_concepts", []),
+        "quality_score": data.get("quality_score", 0),
+        "quality_notes": data.get("quality_notes", ""),
+        "source": data.get("source", {"type": "manual"}),
+        "created_at": datetime.now().isoformat(),
+        "tags": data.get("tags", []),
+        "enabled": True
+    }
+
+    bank["scenarios"].append(scenario)
+    save_scenario_bank(bank)
+
+    return jsonify({"success": True, "scenario": scenario})
+
+
+@app.route("/api/scenario-bank/<scenario_id>")
+def api_scenario_bank_get(scenario_id):
+    """Get a specific scenario from the bank."""
+    bank = load_scenario_bank()
+    for scenario in bank["scenarios"]:
+        if scenario["id"] == scenario_id:
+            return jsonify(scenario)
+    return jsonify({"error": "Scenario not found"}), 404
+
+
+@app.route("/api/scenario-bank/<scenario_id>", methods=["PUT"])
+def api_scenario_bank_update(scenario_id):
+    """Update a scenario in the bank."""
+    data = request.json
+    bank = load_scenario_bank()
+
+    for i, scenario in enumerate(bank["scenarios"]):
+        if scenario["id"] == scenario_id:
+            # Update fields
+            for key in ["name", "messages", "category", "pressure_type",
+                       "candidate_concepts", "tags", "enabled", "quality_notes"]:
+                if key in data:
+                    scenario[key] = data[key]
+            bank["scenarios"][i] = scenario
+            save_scenario_bank(bank)
+            return jsonify({"success": True, "scenario": scenario})
+
+    return jsonify({"error": "Scenario not found"}), 404
+
+
+@app.route("/api/scenario-bank/<scenario_id>", methods=["DELETE"])
+def api_scenario_bank_delete(scenario_id):
+    """Delete a scenario from the bank."""
+    bank = load_scenario_bank()
+    original_count = len(bank["scenarios"])
+    bank["scenarios"] = [s for s in bank["scenarios"] if s["id"] != scenario_id]
+
+    if len(bank["scenarios"]) < original_count:
+        save_scenario_bank(bank)
+        return jsonify({"success": True})
+
+    return jsonify({"error": "Scenario not found"}), 404
+
+
+@app.route("/api/scenario-bank/tags")
+def api_scenario_bank_tags():
+    """List all tags in the scenario bank."""
+    bank = load_scenario_bank()
+    return jsonify(bank.get("tags", []))
+
+
+@app.route("/api/scenario-bank/tags", methods=["POST"])
+def api_scenario_bank_add_tag():
+    """Add a new tag to the scenario bank."""
+    data = request.json
+    tag = data.get("tag", "").strip()
+    if not tag:
+        return jsonify({"error": "Tag cannot be empty"}), 400
+
+    bank = load_scenario_bank()
+    if tag not in bank["tags"]:
+        bank["tags"].append(tag)
+        save_scenario_bank(bank)
+
+    return jsonify({"success": True, "tags": bank["tags"]})
+
+
+# ============================================================
+# Training Datasets API
+# ============================================================
+
+@app.route("/training-data")
+def training_data_page():
+    """Training Data page."""
+    datasets_data = load_training_datasets()
+    training_data = load_training_data()
+    return render_template(
+        "training_data.html",
+        datasets=datasets_data.get("datasets", []),
+        default_dataset_id=datasets_data.get("default_dataset_id"),
+        data_points=training_data.get("data_points", [])
+    )
+
+
+@app.route("/api/datasets")
+def api_datasets_list():
+    """List all datasets."""
+    datasets_data = load_training_datasets()
+    training_data = load_training_data()
+
+    # Add data point counts
+    for dataset in datasets_data["datasets"]:
+        dataset["data_point_count"] = len([
+            dp for dp in training_data["data_points"]
+            if dp.get("dataset_id") == dataset["id"]
+        ])
+
+    return jsonify(datasets_data)
+
+
+@app.route("/api/datasets", methods=["POST"])
+def api_datasets_create():
+    """Create a new dataset."""
+    data = request.json
+    datasets_data = load_training_datasets()
+
+    dataset = {
+        "id": generate_id("ds"),
+        "name": data.get("name", "New Dataset"),
+        "description": data.get("description", ""),
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+        "version": 1,
+        "locked": False
+    }
+
+    datasets_data["datasets"].append(dataset)
+
+    # Set as default if first dataset
+    if len(datasets_data["datasets"]) == 1:
+        datasets_data["default_dataset_id"] = dataset["id"]
+
+    save_training_datasets(datasets_data)
+
+    return jsonify({"success": True, "dataset": dataset})
+
+
+@app.route("/api/datasets/<dataset_id>")
+def api_datasets_get(dataset_id):
+    """Get a specific dataset."""
+    datasets_data = load_training_datasets()
+    for dataset in datasets_data["datasets"]:
+        if dataset["id"] == dataset_id:
+            return jsonify(dataset)
+    return jsonify({"error": "Dataset not found"}), 404
+
+
+@app.route("/api/datasets/<dataset_id>", methods=["PUT"])
+def api_datasets_update(dataset_id):
+    """Update a dataset."""
+    data = request.json
+    datasets_data = load_training_datasets()
+
+    for i, dataset in enumerate(datasets_data["datasets"]):
+        if dataset["id"] == dataset_id:
+            for key in ["name", "description", "locked"]:
+                if key in data:
+                    dataset[key] = data[key]
+            dataset["updated_at"] = datetime.now().isoformat()
+            datasets_data["datasets"][i] = dataset
+            save_training_datasets(datasets_data)
+            return jsonify({"success": True, "dataset": dataset})
+
+    return jsonify({"error": "Dataset not found"}), 404
+
+
+@app.route("/api/datasets/<dataset_id>", methods=["DELETE"])
+def api_datasets_delete(dataset_id):
+    """Delete a dataset and its data points."""
+    datasets_data = load_training_datasets()
+    training_data = load_training_data()
+
+    original_count = len(datasets_data["datasets"])
+    datasets_data["datasets"] = [d for d in datasets_data["datasets"] if d["id"] != dataset_id]
+
+    if len(datasets_data["datasets"]) < original_count:
+        # Also remove data points
+        training_data["data_points"] = [
+            dp for dp in training_data["data_points"]
+            if dp.get("dataset_id") != dataset_id
+        ]
+        save_training_datasets(datasets_data)
+        save_training_data(training_data)
+        return jsonify({"success": True})
+
+    return jsonify({"error": "Dataset not found"}), 404
+
+
+# ============================================================
+# Training Data Points API
+# ============================================================
+
+@app.route("/api/training-data")
+def api_training_data_list():
+    """List training data points, optionally filtered by dataset."""
+    training_data = load_training_data()
+    dataset_id = request.args.get("dataset_id")
+
+    data_points = training_data.get("data_points", [])
+    if dataset_id:
+        data_points = [dp for dp in data_points if dp.get("dataset_id") == dataset_id]
+
+    return jsonify(data_points)
+
+
+@app.route("/api/training-data", methods=["POST"])
+def api_training_data_add():
+    """Add a training data point."""
+    data = request.json
+    training_data = load_training_data()
+
+    data_point = {
+        "id": generate_id("dp"),
+        "dataset_id": data.get("dataset_id"),
+        "scenario": data.get("scenario", {}),
+        "default_response": data.get("default_response", ""),
+        "steered_response": data.get("steered_response", ""),
+        "feature": data.get("feature", {}),
+        "strength": data.get("strength", 0),
+        "source": data.get("source", {}),
+        "created_at": datetime.now().isoformat(),
+        "notes": data.get("notes", "")
+    }
+
+    training_data["data_points"].append(data_point)
+    save_training_data(training_data)
+
+    # Update dataset timestamp
+    datasets_data = load_training_datasets()
+    for dataset in datasets_data["datasets"]:
+        if dataset["id"] == data_point["dataset_id"]:
+            dataset["updated_at"] = datetime.now().isoformat()
+            save_training_datasets(datasets_data)
+            break
+
+    return jsonify({"success": True, "data_point": data_point})
+
+
+@app.route("/api/training-data/<data_point_id>")
+def api_training_data_get(data_point_id):
+    """Get a specific data point."""
+    training_data = load_training_data()
+    for dp in training_data["data_points"]:
+        if dp["id"] == data_point_id:
+            return jsonify(dp)
+    return jsonify({"error": "Data point not found"}), 404
+
+
+@app.route("/api/training-data/<data_point_id>", methods=["PUT"])
+def api_training_data_update(data_point_id):
+    """Update a data point."""
+    data = request.json
+    training_data = load_training_data()
+
+    for i, dp in enumerate(training_data["data_points"]):
+        if dp["id"] == data_point_id:
+            for key in ["notes"]:
+                if key in data:
+                    dp[key] = data[key]
+            training_data["data_points"][i] = dp
+            save_training_data(training_data)
+            return jsonify({"success": True, "data_point": dp})
+
+    return jsonify({"error": "Data point not found"}), 404
+
+
+@app.route("/api/training-data/<data_point_id>", methods=["DELETE"])
+def api_training_data_delete(data_point_id):
+    """Delete a data point."""
+    training_data = load_training_data()
+    original_count = len(training_data["data_points"])
+    training_data["data_points"] = [
+        dp for dp in training_data["data_points"]
+        if dp["id"] != data_point_id
+    ]
+
+    if len(training_data["data_points"]) < original_count:
+        save_training_data(training_data)
+        return jsonify({"success": True})
+
+    return jsonify({"error": "Data point not found"}), 404
+
+
+@app.route("/api/training-data/<data_point_id>/move", methods=["POST"])
+def api_training_data_move(data_point_id):
+    """Move a data point to a different dataset."""
+    data = request.json
+    target_dataset_id = data.get("target_dataset_id")
+
+    if not target_dataset_id:
+        return jsonify({"error": "target_dataset_id is required"}), 400
+
+    training_data = load_training_data()
+    datasets_data = load_training_datasets()
+
+    # Verify target dataset exists
+    if not any(d["id"] == target_dataset_id for d in datasets_data["datasets"]):
+        return jsonify({"error": "Target dataset not found"}), 404
+
+    for i, dp in enumerate(training_data["data_points"]):
+        if dp["id"] == data_point_id:
+            old_dataset_id = dp.get("dataset_id")
+            dp["dataset_id"] = target_dataset_id
+            training_data["data_points"][i] = dp
+            save_training_data(training_data)
+
+            # Update both dataset timestamps
+            for dataset in datasets_data["datasets"]:
+                if dataset["id"] in [old_dataset_id, target_dataset_id]:
+                    dataset["updated_at"] = datetime.now().isoformat()
+            save_training_datasets(datasets_data)
+
+            return jsonify({"success": True, "data_point": dp})
+
+    return jsonify({"error": "Data point not found"}), 404
+
+
+@app.route("/api/datasets/<dataset_id>/export")
+def api_datasets_export(dataset_id):
+    """Export a dataset as JSON."""
+    datasets_data = load_training_datasets()
+    training_data = load_training_data()
+
+    dataset = None
+    for d in datasets_data["datasets"]:
+        if d["id"] == dataset_id:
+            dataset = d
+            break
+
+    if not dataset:
+        return jsonify({"error": "Dataset not found"}), 404
+
+    data_points = [
+        dp for dp in training_data["data_points"]
+        if dp.get("dataset_id") == dataset_id
+    ]
+
+    export = {
+        "dataset": dataset,
+        "data_points": data_points,
+        "exported_at": datetime.now().isoformat()
+    }
+
+    return jsonify(export)
 
 
 if __name__ == "__main__":

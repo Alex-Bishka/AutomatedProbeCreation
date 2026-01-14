@@ -216,6 +216,9 @@
                         {% endfor %}
                     </div>
                 </details>
+                <div class="scenario-actions">
+                    <button class="btn small success" onclick='saveToBank({{ scenario|tojson }})'>Save to Bank</button>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -442,12 +445,21 @@
                                     <div class="response-pair">
                                         <div class="response default">
                                             <strong>Default:</strong>
-                                            <p>{{ result.default[:300] if result.default else 'No response' }}{% if result.default and result.default|length > 300 %}...{% endif %}</p>
+                                            <p>{{ result.default if result.default else 'No response' }}</p>
                                         </div>
                                         <div class="response steered">
                                             <strong>Steered:</strong>
-                                            <p>{{ result.steered[:300] if result.steered else 'No response' }}{% if result.steered and result.steered|length > 300 %}...{% endif %}</p>
+                                            <p>{{ result.steered if result.steered else 'No response' }}</p>
                                         </div>
+                                    </div>
+                                    <div class="result-actions mt-1">
+                                        <button class="btn small success" onclick='addToDataset({
+                                            "scenario": {{ result.scenario|tojson }},
+                                            "feature": {{ experiment.feature|tojson }},
+                                            "strength": {{ strength }},
+                                            "default": {{ result.default|tojson }},
+                                            "steered": {{ result.steered|tojson }}
+                                        }, "{{ job.job_id }}")'>Add to Dataset</button>
                                     </div>
                                     {% endif %}
                                 </div>
@@ -561,6 +573,49 @@
     </div>
 </div>
 
+<!-- Training Set Section -->
+<div class="section collapsible">
+    <h3 class="section-header" onclick="toggleSection(this)">
+        <span class="toggle-icon">+</span>
+        Training Set ({{ job.training_set|length if job.training_set else 0 }})
+    </h3>
+    <div class="section-content" style="display: none;">
+        {% if job.training_set %}
+        <p class="section-intro">Successful steering results that can be added to a training dataset.</p>
+        <div class="training-set-list">
+            {% for item in job.training_set %}
+            <div class="training-item">
+                <div class="training-header">
+                    <div class="training-info">
+                        <strong>{{ item.scenario.name if item.scenario.name else 'Unnamed Scenario' }}</strong>
+                        <span class="feature-badge">L{{ item.feature.layer.split('-')[0] if item.feature.layer else '?' }}:{{ item.feature.index }} @ {{ item.strength }}</span>
+                    </div>
+                    <button class="btn small success" onclick='addToDataset({{ item|tojson }}, "{{ job.job_id }}")'>Add to Dataset</button>
+                </div>
+                <details class="training-details">
+                    <summary>View Details</summary>
+                    <div class="training-content">
+                        <div class="response-comparison">
+                            <div class="response-col default">
+                                <h6>Default Response</h6>
+                                <div class="response-text">{{ item.default if item.default else '(empty)' }}</div>
+                            </div>
+                            <div class="response-col steered">
+                                <h6>Steered Response</h6>
+                                <div class="response-text">{{ item.steered if item.steered else '(empty)' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No training set data available. Successful feature evaluations will appear here.</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Mixed Feature Steering Section -->
 <div class="section collapsible">
     <h3 class="section-header" onclick="toggleSection(this)">
@@ -625,11 +680,11 @@
                 <div class="response-comparison">
                     <div class="response-col default">
                         <h5>Default</h5>
-                        <div class="response-text">{{ result.default[:500] if result.default else 'No response' }}{% if result.default and result.default|length > 500 %}...{% endif %}</div>
+                        <div class="response-text">{{ result.default if result.default else 'No response' }}</div>
                     </div>
                     <div class="response-col steered">
                         <h5>Steered (Mixed)</h5>
-                        <div class="response-text">{{ result.steered[:500] if result.steered else 'No response' }}{% if result.steered and result.steered|length > 500 %}...{% endif %}</div>
+                        <div class="response-text">{{ result.steered if result.steered else 'No response' }}</div>
                     </div>
                 </div>
                 {% endif %}
@@ -949,6 +1004,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .response-text {
     font-size: 0.9rem;
     white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 250px;
+    overflow-y: auto;
 }
 
 .error-message {
@@ -1203,6 +1261,8 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 0.5rem;
     border-radius: 4px;
     border-left: 3px solid #9ca3af;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 .response.steered {
@@ -1210,11 +1270,15 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 0.5rem;
     border-radius: 4px;
     border-left: 3px solid #10b981;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 .response p {
     margin: 0.25rem 0 0 0;
     font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 /* Feature Evaluations */
@@ -1455,5 +1519,163 @@ document.addEventListener('DOMContentLoaded', function() {
 .success-text { color: #059669; }
 .warning-text { color: #d97706; }
 .failure-text { color: #dc2626; }
+
+/* Scenario and Training Set Actions */
+.scenario-actions, .training-header {
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.training-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #fff;
+}
+
+.training-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.feature-badge {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+.training-details {
+    margin-top: 0.75rem;
+}
+
+.training-content {
+    margin-top: 0.5rem;
+}
+
+.section-intro {
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.btn.small.success {
+    background: #10b981;
+    color: white;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.btn.small.success:hover {
+    background: #059669;
+}
 </style>
+
+<script>
+async function saveToBank(scenario) {
+    try {
+        const response = await fetch('/api/scenario-bank', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: scenario.name,
+                messages: scenario.messages,
+                category: scenario.category || '',
+                pressure_type: scenario.pressure_type || '',
+                candidate_concepts: scenario.candidate_concepts || [],
+                quality_score: scenario.quality_score || 0,
+                quality_notes: scenario.quality_notes || '',
+                source: {
+                    type: 'pipeline',
+                    job_id: '{{ job.job_id }}'
+                },
+                tags: []
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert('Scenario saved to bank!');
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error saving scenario: ' + error.message);
+    }
+}
+
+async function addToDataset(item, jobId) {
+    // First check if datasets exist
+    const datasetsResponse = await fetch('/api/datasets');
+    const datasetsData = await datasetsResponse.json();
+
+    if (!datasetsData.datasets || datasetsData.datasets.length === 0) {
+        const createNew = confirm('No datasets exist. Would you like to create one?');
+        if (createNew) {
+            const name = prompt('Enter dataset name:', 'Deception Probe v1');
+            if (!name) return;
+
+            const createResponse = await fetch('/api/datasets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, description: '' })
+            });
+            const newDataset = await createResponse.json();
+            if (!newDataset.success) {
+                alert('Error creating dataset');
+                return;
+            }
+            datasetsData.datasets = [newDataset.dataset];
+        } else {
+            return;
+        }
+    }
+
+    // Choose dataset
+    let datasetId;
+    if (datasetsData.datasets.length === 1) {
+        datasetId = datasetsData.datasets[0].id;
+    } else {
+        const options = datasetsData.datasets.map((d, i) => `${i + 1}. ${d.name}`).join('\n');
+        const choice = prompt(`Select dataset:\n${options}\n\nEnter number:`);
+        if (!choice) return;
+        const index = parseInt(choice) - 1;
+        if (index < 0 || index >= datasetsData.datasets.length) {
+            alert('Invalid selection');
+            return;
+        }
+        datasetId = datasetsData.datasets[index].id;
+    }
+
+    try {
+        const response = await fetch('/api/training-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                dataset_id: datasetId,
+                scenario: item.scenario,
+                default_response: item.default,
+                steered_response: item.steered,
+                feature: item.feature,
+                strength: item.strength,
+                source: { type: 'job', job_id: jobId }
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert('Added to dataset!');
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error adding to dataset: ' + error.message);
+    }
+}
+</script>
 {% endblock %}

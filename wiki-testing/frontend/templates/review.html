@@ -121,9 +121,12 @@
 <!-- Reviewed Items (Collapsed) -->
 {% if reviewed %}
 <div class="section mt-2">
-    <h3 class="collapsible" onclick="toggleCollapsible(this)">
-        Reviewed Items ({{ reviewed|length }})
-    </h3>
+    <div class="reviewed-header">
+        <h3 class="collapsible" onclick="toggleCollapsible(this)">
+            Reviewed Items ({{ reviewed|length }})
+        </h3>
+        <button class="btn danger" onclick="clearReviewed()">Clear All Reviewed</button>
+    </div>
     <div class="collapsible-content">
         <table>
             <thead>
@@ -178,6 +181,30 @@ async function submitVerdict(itemId, verdict) {
         }
     } catch (error) {
         alert('Error submitting verdict: ' + error.message);
+    }
+}
+
+async function clearReviewed() {
+    if (!confirm('Are you sure you want to delete all reviewed items? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/pipeline/review-queue/clear-reviewed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(`Cleared ${data.cleared} reviewed items.`);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error clearing reviewed items: ' + error.message);
     }
 }
 </script>
@@ -415,6 +442,27 @@ async function submitVerdict(itemId, verdict) {
 
 .mt-2 {
     margin-top: 2rem;
+}
+
+.reviewed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.reviewed-header h3 {
+    margin: 0;
+}
+
+.reviewed-header .btn.danger {
+    background: #ef4444;
+    color: white;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+.reviewed-header .btn.danger:hover {
+    background: #dc2626;
 }
 </style>
 {% endblock %}

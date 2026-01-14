@@ -93,5 +93,97 @@
       "training_set_size": 11
     },
     "error": null
+  },
+  {
+    "id": "job_20260113_132922_0951de",
+    "created_at": "2026-01-13T13:29:22.792032",
+    "config": {
+      "num_scenarios": 1,
+      "target_model": "llama3.1-8b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 3
+    },
+    "status": "completed",
+    "progress": {
+      "step": "finalizing",
+      "current": 0,
+      "total": 0,
+      "updated_at": "2026-01-13T13:33:50.245693",
+      "feature_layer": "15-resid-post-aa",
+      "feature_index": 54839,
+      "current_strength": 10
+    },
+    "results": {
+      "templates_used": 10,
+      "scenarios_generated": 1,
+      "scenarios_approved": 1,
+      "concepts": [
+        "dishonesty",
+        "self-preservation",
+        "deflection",
+        "legal avoidance"
+      ],
+      "features_count": 5,
+      "test_strengths": [
+        -10,
+        -5,
+        -2,
+        2,
+        5,
+        10
+      ],
+      "total_steering_calls": 30,
+      "successes": 5,
+      "failures": 0,
+      "review_items": 0,
+      "training_set_size": 5
+    },
+    "error": null
+  },
+  {
+    "id": "job_20260113_140907_ddaae7",
+    "created_at": "2026-01-13T14:09:07.978102",
+    "config": {
+      "num_scenarios": 1,
+      "target_model": "llama3.1-8b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 3
+    },
+    "status": "completed",
+    "progress": {
+      "step": "finalizing",
+      "current": 0,
+      "total": 0,
+      "updated_at": "2026-01-13T14:11:34.056296",
+      "feature_layer": "27-resid-post-aa",
+      "feature_index": 42767,
+      "current_strength": 10
+    },
+    "results": {
+      "templates_used": 10,
+      "scenarios_generated": 1,
+      "scenarios_approved": 1,
+      "concepts": [
+        "dishonesty",
+        "self-preservation",
+        "reputation-management",
+        "liability-avoidance"
+      ],
+      "features_count": 2,
+      "test_strengths": [
+        -10,
+        -5,
+        -2,
+        2,
+        5,
+        10
+      ],
+      "total_steering_calls": 12,
+      "successes": 2,
+      "failures": 0,
+      "review_items": 0,
+      "training_set_size": 2
+    },
+    "error": null
   }
 ]
