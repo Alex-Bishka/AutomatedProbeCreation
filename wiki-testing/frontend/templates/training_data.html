@@ -1,0 +1,739 @@
+{% extends "base.html" %}
+
+{% block title %}Training Data - SAE Steering{% endblock %}
+
+{% block content %}
+<h2>Training Data</h2>
+<p>Curated steering results organized into datasets for probe training.</p>
+
+<!-- Stats Section -->
+<div class="stats-bar">
+    <div class="stat">
+        <span class="stat-value">{{ datasets|length }}</span>
+        <span class="stat-label">Datasets</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{ data_points|length }}</span>
+        <span class="stat-label">Total Data Points</span>
+    </div>
+</div>
+
+<!-- Dataset Selector -->
+<div class="dataset-section">
+    <div class="dataset-header">
+        <div class="dataset-tabs">
+            <button class="dataset-tab active" data-dataset="" onclick="selectDataset(this, '')">
+                All ({{ data_points|length }})
+            </button>
+            {% for dataset in datasets %}
+            <button class="dataset-tab" data-dataset="{{ dataset.id }}" onclick="selectDataset(this, '{{ dataset.id }}')">
+                {{ dataset.name }} ({{ data_points|selectattr('dataset_id', 'equalto', dataset.id)|list|length }})
+            </button>
+            {% endfor %}
+        </div>
+        <button class="btn" onclick="showCreateDatasetModal()">+ New Dataset</button>
+    </div>
+
+    <!-- Dataset Actions (shown when a dataset is selected) -->
+    <div id="dataset-actions" class="dataset-actions" style="display: none;">
+        <span id="selected-dataset-name" class="dataset-name"></span>
+        <div class="dataset-action-buttons">
+            <button class="btn small" onclick="exportDataset()">Export JSON</button>
+            <button class="btn small" onclick="editDataset()">Edit</button>
+            <button class="btn small danger" onclick="deleteDataset()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Data Points List -->
+<div class="section">
+    <h3>Data Points <span id="data-count"></span></h3>
+
+    {% if data_points %}
+    <div class="data-points-list" id="data-points-list">
+        {% for dp in data_points %}
+        <div class="data-point-card" data-dataset="{{ dp.dataset_id }}" id="dp-{{ dp.id }}">
+            <div class="dp-header" onclick="toggleDataPoint(this)">
+                <div class="dp-title">
+                    <span class="expand-icon">+</span>
+                    <div class="dp-info">
+                        <strong>{{ dp.scenario.name if dp.scenario.name else 'Unnamed Scenario' }}</strong>
+                        <span class="dp-meta">
+                            Feature: L{{ dp.feature.layer.split('-')[0] if dp.feature.layer else '?' }}:{{ dp.feature.index }} @ strength {{ dp.strength }}
+                        </span>
+                    </div>
+                </div>
+                <div class="dp-badges">
+                    {% for dataset in datasets if dataset.id == dp.dataset_id %}
+                    <span class="dataset-badge">{{ dataset.name }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="dp-details" style="display: none;">
+                <!-- Scenario Context -->
+                <div class="detail-section">
+                    <h5>Scenario Context</h5>
+                    <div class="messages-list">
+                        {% for msg in dp.scenario.messages %}
+                        <div class="message {{ msg.role }}">
+                            <span class="role-badge">{{ msg.role }}</span>
+                            <div class="message-content">{{ msg.content }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Responses Comparison -->
+                <div class="detail-section">
+                    <h5>Responses</h5>
+                    <div class="response-comparison">
+                        <div class="response-col default">
+                            <h6>Default</h6>
+                            <div class="response-text">{{ dp.default_response if dp.default_response else '(empty)' }}</div>
+                        </div>
+                        <div class="response-col steered">
+                            <h6>Steered</h6>
+                            <div class="response-text">{{ dp.steered_response if dp.steered_response else '(empty)' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature Info -->
+                <div class="detail-section">
+                    <h5>Feature Details</h5>
+                    <div class="feature-info">
+                        <p><strong>Layer:</strong> {{ dp.feature.layer }}</p>
+                        <p><strong>Index:</strong> {{ dp.feature.index }}</p>
+                        <p><strong>Description:</strong> {{ dp.feature.description or 'N/A' }}</p>
+                        <p><strong>Strength:</strong> {{ dp.strength }}</p>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="detail-section">
+                    <h5>Notes</h5>
+                    <textarea id="notes-{{ dp.id }}" class="notes-input" placeholder="Add notes...">{{ dp.notes or '' }}</textarea>
+                    <button class="btn small" onclick="saveNotes('{{ dp.id }}')">Save Notes</button>
+                </div>
+
+                <!-- Actions -->
+                <div class="dp-actions">
+                    <select id="move-{{ dp.id }}" class="move-select">
+                        <option value="">Move to dataset...</option>
+                        {% for dataset in datasets %}
+                        <option value="{{ dataset.id }}" {% if dataset.id == dp.dataset_id %}disabled{% endif %}>
+                            {{ dataset.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn small" onclick="moveDataPoint('{{ dp.id }}')">Move</button>
+                    <button class="btn small danger" onclick="deleteDataPoint('{{ dp.id }}')">Delete</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No data points yet. Add successful steering results from job details pages.</p>
+    {% endif %}
+</div>
+
+<!-- Create Dataset Modal -->
+<div id="create-dataset-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Dataset</h3>
+            <button class="close-btn" onclick="hideCreateDatasetModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="dataset-name">Dataset Name</label>
+                <input type="text" id="dataset-name" placeholder="e.g., Deception Probe v1">
+            </div>
+            <div class="form-group">
+                <label for="dataset-description">Description</label>
+                <textarea id="dataset-description" placeholder="Describe this dataset..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="hideCreateDatasetModal()">Cancel</button>
+            <button class="btn success" onclick="createDataset()">Create Dataset</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Dataset Modal -->
+<div id="edit-dataset-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Dataset</h3>
+            <button class="close-btn" onclick="hideEditDatasetModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="edit-dataset-name">Dataset Name</label>
+                <input type="text" id="edit-dataset-name">
+            </div>
+            <div class="form-group">
+                <label for="edit-dataset-description">Description</label>
+                <textarea id="edit-dataset-description"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="hideEditDatasetModal()">Cancel</button>
+            <button class="btn success" onclick="updateDataset()">Save Changes</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedDatasetId = '';
+const datasets = {{ datasets|tojson }};
+
+function selectDataset(tab, datasetId) {
+    // Update tab styles
+    document.querySelectorAll('.dataset-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+
+    selectedDatasetId = datasetId;
+
+    // Show/hide dataset actions
+    const actionsDiv = document.getElementById('dataset-actions');
+    if (datasetId) {
+        const dataset = datasets.find(d => d.id === datasetId);
+        document.getElementById('selected-dataset-name').textContent = dataset ? dataset.name : '';
+        actionsDiv.style.display = 'flex';
+    } else {
+        actionsDiv.style.display = 'none';
+    }
+
+    // Filter data points
+    const cards = document.querySelectorAll('.data-point-card');
+    let visibleCount = 0;
+    cards.forEach(card => {
+        if (!datasetId || card.dataset.dataset === datasetId) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    document.getElementById('data-count').textContent = `(${visibleCount})`;
+}
+
+function toggleDataPoint(header) {
+    const card = header.closest('.data-point-card');
+    const details = card.querySelector('.dp-details');
+    const icon = card.querySelector('.expand-icon');
+
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.textContent = '-';
+    } else {
+        details.style.display = 'none';
+        icon.textContent = '+';
+    }
+}
+
+function showCreateDatasetModal() {
+    document.getElementById('create-dataset-modal').style.display = 'flex';
+}
+
+function hideCreateDatasetModal() {
+    document.getElementById('create-dataset-modal').style.display = 'none';
+}
+
+async function createDataset() {
+    const name = document.getElementById('dataset-name').value.trim();
+    const description = document.getElementById('dataset-description').value.trim();
+
+    if (!name) {
+        alert('Please enter a dataset name');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/datasets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description })
+        });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error creating dataset');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+function editDataset() {
+    const dataset = datasets.find(d => d.id === selectedDatasetId);
+    if (!dataset) return;
+
+    document.getElementById('edit-dataset-name').value = dataset.name;
+    document.getElementById('edit-dataset-description').value = dataset.description || '';
+    document.getElementById('edit-dataset-modal').style.display = 'flex';
+}
+
+function hideEditDatasetModal() {
+    document.getElementById('edit-dataset-modal').style.display = 'none';
+}
+
+async function updateDataset() {
+    const name = document.getElementById('edit-dataset-name').value.trim();
+    const description = document.getElementById('edit-dataset-description').value.trim();
+
+    if (!name) {
+        alert('Please enter a dataset name');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/datasets/${selectedDatasetId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description })
+        });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error updating dataset');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deleteDataset() {
+    if (!confirm('Are you sure you want to delete this dataset and all its data points?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/datasets/${selectedDatasetId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error deleting dataset');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function exportDataset() {
+    window.open(`/api/datasets/${selectedDatasetId}/export`, '_blank');
+}
+
+async function saveNotes(dpId) {
+    const notes = document.getElementById(`notes-${dpId}`).value;
+
+    try {
+        const response = await fetch(`/api/training-data/${dpId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes })
+        });
+
+        if (response.ok) {
+            alert('Notes saved');
+        } else {
+            alert('Error saving notes');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function moveDataPoint(dpId) {
+    const targetDatasetId = document.getElementById(`move-${dpId}`).value;
+    if (!targetDatasetId) {
+        alert('Please select a dataset');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/training-data/${dpId}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_dataset_id: targetDatasetId })
+        });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error moving data point');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deleteDataPoint(dpId) {
+    if (!confirm('Are you sure you want to delete this data point?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/training-data/${dpId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            document.getElementById(`dp-${dpId}`).remove();
+        } else {
+            alert('Error deleting data point');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Initialize count
+document.addEventListener('DOMContentLoaded', function() {
+    const count = document.querySelectorAll('.data-point-card').length;
+    document.getElementById('data-count').textContent = `(${count})`;
+});
+</script>
+
+<style>
+.dataset-section {
+    margin-bottom: 1.5rem;
+}
+
+.dataset-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.dataset-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.dataset-tab {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.dataset-tab:hover {
+    background: #f3f4f6;
+}
+
+.dataset-tab.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.dataset-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f9fafb;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.dataset-name {
+    font-weight: 600;
+}
+
+.dataset-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.data-point-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.dp-header {
+    padding: 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dp-header:hover {
+    background: #f9fafb;
+}
+
+.dp-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.dp-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.dp-meta {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.expand-icon {
+    font-family: monospace;
+    font-size: 1.2rem;
+    width: 1.5rem;
+    text-align: center;
+    color: #666;
+}
+
+.dataset-badge {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.dp-details {
+    padding: 0 1rem 1rem 1rem;
+    border-top: 1px solid #e0e0e0;
+    background: #fafafa;
+}
+
+.detail-section {
+    margin: 1rem 0;
+}
+
+.detail-section h5 {
+    margin: 0 0 0.5rem 0;
+    color: #374151;
+}
+
+.messages-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.message {
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+}
+
+.message.system {
+    background: #e0e7ff;
+    border-left: 3px solid #6366f1;
+}
+
+.message.user {
+    background: #dbeafe;
+    border-left: 3px solid #3b82f6;
+}
+
+.message.assistant {
+    background: #d1fae5;
+    border-left: 3px solid #10b981;
+}
+
+.role-badge {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.message-content {
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
+.response-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.response-col {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.response-col.default {
+    border-left: 3px solid #9ca3af;
+}
+
+.response-col.steered {
+    border-left: 3px solid #10b981;
+}
+
+.response-col h6 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.response-text {
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.feature-info p {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+.notes-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-height: 60px;
+    resize: vertical;
+    margin-bottom: 0.5rem;
+}
+
+.dp-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.move-select {
+    padding: 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.modal-body {
+    padding: 1rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.modal-footer {
+    padding: 1rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.btn.small {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.btn.success {
+    background: #10b981;
+    color: white;
+}
+
+.btn.success:hover {
+    background: #059669;
+}
+
+.btn.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn.danger:hover {
+    background: #dc2626;
+}
+</style>
+{% endblock %}

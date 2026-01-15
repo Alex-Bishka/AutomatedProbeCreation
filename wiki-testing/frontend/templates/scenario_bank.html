@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+
+{% block title %}Scenario Bank - SAE Steering{% endblock %}
+
+{% block content %}
+<h2>Scenario Bank</h2>
+<p>Curated collection of high-quality scenarios for pipeline generation.</p>
+
+<!-- Stats Section -->
+<div class="stats-bar">
+    <div class="stat">
+        <span class="stat-value">{{ scenarios|length }}</span>
+        <span class="stat-label">Banked</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{ scenarios|selectattr('enabled')|list|length }}</span>
+        <span class="stat-label">Enabled</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{ pipeline_scenarios|length }}</span>
+        <span class="stat-label">Pipeline Generated</span>
+    </div>
+</div>
+
+<!-- Action Bar -->
+<div class="action-bar">
+    <button class="btn" onclick="showImportModal()">Import from Pipeline</button>
+    <div class="tag-filter">
+        <label>Filter by tag:</label>
+        <select id="tag-filter" onchange="filterByTag()">
+            <option value="">All</option>
+            {% for tag in tags %}
+            <option value="{{ tag }}">{{ tag }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<!-- Banked Scenarios -->
+<div class="section">
+    <h3>Banked Scenarios ({{ scenarios|length }})</h3>
+
+    {% if scenarios %}
+    <div class="scenario-list" id="scenario-list">
+        {% for scenario in scenarios %}
+        <div class="scenario-card {% if not scenario.enabled %}disabled{% endif %}" data-tags="{{ scenario.tags|join(',') }}" id="scenario-{{ scenario.id }}">
+            <div class="scenario-header" onclick="toggleExpand(this)">
+                <div class="scenario-title">
+                    <span class="expand-icon">+</span>
+                    <h4>{{ scenario.name }}</h4>
+                    {% if scenario.quality_score %}
+                    <span class="quality-badge">{{ (scenario.quality_score * 100)|round(0) }}%</span>
+                    {% endif %}
+                </div>
+                <div class="scenario-meta">
+                    <span class="category-tag">{{ scenario.category or 'Uncategorized' }}</span>
+                    {% if not scenario.enabled %}
+                    <span class="status-badge disabled">Disabled</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="scenario-details" style="display: none;">
+                <!-- Pressure Type -->
+                {% if scenario.pressure_type %}
+                <div class="detail-row">
+                    <strong>Pressure Type:</strong> {{ scenario.pressure_type }}
+                </div>
+                {% endif %}
+
+                <!-- Tags -->
+                <div class="detail-row">
+                    <strong>Tags:</strong>
+                    {% for tag in scenario.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% else %}
+                    <span class="text-muted">No tags</span>
+                    {% endfor %}
+                </div>
+
+                <!-- Candidate Concepts -->
+                {% if scenario.candidate_concepts %}
+                <div class="detail-row">
+                    <strong>Concepts:</strong>
+                    {% for concept in scenario.candidate_concepts %}
+                    <code>{{ concept }}</code>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Messages -->
+                <div class="messages-section">
+                    <strong>Messages:</strong>
+                    <div class="messages-list">
+                        {% for msg in scenario.messages %}
+                        <div class="message {{ msg.role }}">
+                            <span class="role-badge">{{ msg.role }}</span>
+                            <div class="message-content">{{ msg.content }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Quality Notes -->
+                {% if scenario.quality_notes %}
+                <div class="detail-row">
+                    <strong>Quality Notes:</strong>
+                    <p class="quality-notes">{{ scenario.quality_notes }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Actions -->
+                <div class="scenario-actions">
+                    <button class="btn small" onclick="toggleEnabled('{{ scenario.id }}', {{ 'false' if scenario.enabled else 'true' }})">
+                        {{ 'Disable' if scenario.enabled else 'Enable' }}
+                    </button>
+                    <button class="btn small danger" onclick="deleteScenario('{{ scenario.id }}')">Delete</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No scenarios in the bank yet. Import from pipeline-generated scenarios below.</p>
+    {% endif %}
+</div>
+
+<!-- Import Modal -->
+<div id="import-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Import from Pipeline Scenarios</h3>
+            <button class="close-btn" onclick="hideImportModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Select scenarios to add to your bank:</p>
+            <div class="import-list">
+                {% for scenario in pipeline_scenarios %}
+                <div class="import-item">
+                    <label>
+                        <input type="checkbox" name="import" value="{{ loop.index0 }}" data-scenario='{{ scenario|tojson }}'>
+                        <strong>{{ scenario.name }}</strong>
+                        {% if scenario.quality_score %}
+                        <span class="quality-badge">{{ (scenario.quality_score * 100)|round(0) }}%</span>
+                        {% endif %}
+                        <br>
+                        <span class="text-muted text-small">{{ scenario.category or 'Uncategorized' }}</span>
+                    </label>
+                </div>
+                {% else %}
+                <p class="text-muted">No pipeline scenarios available to import.</p>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="hideImportModal()">Cancel</button>
+            <button class="btn success" onclick="importSelected()">Import Selected</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleExpand(header) {
+    const card = header.closest('.scenario-card');
+    const details = card.querySelector('.scenario-details');
+    const icon = card.querySelector('.expand-icon');
+
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.textContent = '-';
+    } else {
+        details.style.display = 'none';
+        icon.textContent = '+';
+    }
+}
+
+function filterByTag() {
+    const tag = document.getElementById('tag-filter').value;
+    const cards = document.querySelectorAll('.scenario-card');
+
+    cards.forEach(card => {
+        const tags = card.dataset.tags.split(',');
+        if (!tag || tags.includes(tag)) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function showImportModal() {
+    document.getElementById('import-modal').style.display = 'flex';
+}
+
+function hideImportModal() {
+    document.getElementById('import-modal').style.display = 'none';
+}
+
+async function importSelected() {
+    const checkboxes = document.querySelectorAll('input[name="import"]:checked');
+    let imported = 0;
+
+    for (const checkbox of checkboxes) {
+        const scenario = JSON.parse(checkbox.dataset.scenario);
+        try {
+            const response = await fetch('/api/scenario-bank', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: scenario.name,
+                    messages: scenario.messages,
+                    category: scenario.category,
+                    pressure_type: scenario.pressure_type,
+                    candidate_concepts: scenario.candidate_concepts || [],
+                    quality_score: scenario.quality_score || 0,
+                    quality_notes: scenario.quality_notes || '',
+                    source: {
+                        type: 'pipeline',
+                        job_id: scenario.pipeline_job_id || null
+                    },
+                    tags: []
+                })
+            });
+
+            if (response.ok) {
+                imported++;
+            }
+        } catch (error) {
+            console.error('Error importing scenario:', error);
+        }
+    }
+
+    if (imported > 0) {
+        alert(`Imported ${imported} scenario(s) to the bank.`);
+        location.reload();
+    } else {
+        alert('No scenarios were imported.');
+    }
+}
+
+async function toggleEnabled(scenarioId, enabled) {
+    try {
+        const response = await fetch(`/api/scenario-bank/${scenarioId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Error updating scenario');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deleteScenario(scenarioId) {
+    if (!confirm('Are you sure you want to delete this scenario from the bank?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/scenario-bank/${scenarioId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            document.getElementById(`scenario-${scenarioId}`).remove();
+        } else {
+            alert('Error deleting scenario');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+</script>
+
+<style>
+.action-bar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.tag-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tag-filter select {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.scenario-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.scenario-card.disabled {
+    opacity: 0.6;
+}
+
+.scenario-header {
+    padding: 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.scenario-header:hover {
+    background: #f9fafb;
+}
+
+.scenario-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.scenario-title h4 {
+    margin: 0;
+}
+
+.expand-icon {
+    font-family: monospace;
+    font-size: 1.2rem;
+    width: 1.5rem;
+    text-align: center;
+    color: #666;
+}
+
+.quality-badge {
+    background: #d1fae5;
+    color: #065f46;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.category-tag {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.status-badge.disabled {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+.scenario-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.scenario-details {
+    padding: 0 1rem 1rem 1rem;
+    border-top: 1px solid #e0e0e0;
+    background: #fafafa;
+}
+
+.detail-row {
+    margin: 0.75rem 0;
+}
+
+.tag {
+    background: #f3f4f6;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    margin-right: 0.25rem;
+}
+
+.messages-section {
+    margin: 1rem 0;
+}
+
+.messages-list {
+    margin-top: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.message {
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+}
+
+.message.system {
+    background: #e0e7ff;
+    border-left: 3px solid #6366f1;
+}
+
+.message.user {
+    background: #dbeafe;
+    border-left: 3px solid #3b82f6;
+}
+
+.message.assistant {
+    background: #d1fae5;
+    border-left: 3px solid #10b981;
+}
+
+.role-badge {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.message-content {
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
+.quality-notes {
+    font-style: italic;
+    color: #666;
+    margin: 0.25rem 0;
+}
+
+.scenario-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.modal-body {
+    padding: 1rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.import-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.import-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #eee;
+}
+
+.import-item label {
+    cursor: pointer;
+    display: block;
+}
+
+.import-item input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+.modal-footer {
+    padding: 1rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.btn.small {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.btn.success {
+    background: #10b981;
+    color: white;
+}
+
+.btn.success:hover {
+    background: #059669;
+}
+
+.btn.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn.danger:hover {
+    background: #dc2626;
+}
+</style>
+{% endblock %}
