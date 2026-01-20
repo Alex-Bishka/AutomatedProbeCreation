@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from functools import cache
 import os
 import sys
 from typing import Any, Literal, Optional, cast
@@ -21,8 +22,11 @@ from deception_detection.experiment import Experiment, ExperimentConfig
 from deception_detection.log import logger
 from deception_detection.models import ModelName, get_num_layers_for_model
 from deception_detection.postprocess import ExperimentPostprocessor
-from deception_detection.prompt_scorer import PromptScorerMethod
+from deception_detection.prompt_scorer import PromptScorer, PromptScorerMethod
+from deception_detection.repository import DatasetRepository
 from deception_detection.results.detection_masks import save_detection_masks
+from deception_detection.rollouts import RolloutGenerator
+from deception_detection.utils import REPO_ROOT as DD_REPO_ROOT
 
 DEFAULT_CONFIG = Path(__file__).parent / "configs" / "apollo_llama3_1_8b_all_layers.yaml"
 
@@ -41,7 +45,7 @@ def _get_max_memory_map() -> dict[int, str] | None:
     max_memory: dict[int, str] = {}
     for device_idx in range(torch.cuda.device_count()):
         total_gb = torch.cuda.get_device_properties(device_idx).total_memory / (1024**3)
-        use_gb = min(total_gb * 0.9, cap_gb) if cap_gb is not None else total_gb * 0.9
+        use_gb = min(total_gb * 0.98, cap_gb) if cap_gb is not None else total_gb * 0.98
         max_memory[device_idx] = f"{int(use_gb)}GiB"
     return max_memory
 
@@ -92,6 +96,7 @@ def _patch_llama_model_loading() -> None:
     uses a writable cache_dir + respects HF_TOKEN for gated models.
     """
 
+    @cache
     def _patched_get_llama3_model_and_tokenizer(
         model_name: ModelName, omit_model: bool = False
     ):
@@ -207,6 +212,21 @@ def _patch_postprocess_plotting() -> None:
                 raise
 
         plot_mod.roleplaying_violin = safe_roleplaying_violin  # type: ignore[assignment]
+
+    # Patch violin_plot (can fail on mismatched array lengths in dataframe construction)
+    if hasattr(plot_mod, "violin_plot"):
+        orig_violin_plot = plot_mod.violin_plot
+
+        def safe_violin_plot(*args: Any, **kwargs: Any):
+            try:
+                return orig_violin_plot(*args, **kwargs)
+            except ValueError as e:
+                if "All arrays must be of the same length" in str(e):
+                    logger.warning("Skipping violin plot: %s", e)
+                    return None
+                raise
+
+        plot_mod.violin_plot = safe_violin_plot  # type: ignore[assignment]
 
     plot_mod._apollo_plot_patch_applied = True
 
@@ -332,6 +352,63 @@ def _maybe_set_all_layers(config_dict: dict[str, Any]) -> None:
     config_dict["detect_layers"] = list(range(n_layers))
 
 
+def _ensure_on_policy_rollouts(config_dict: dict[str, Any]) -> None:
+    """
+    Ensure on-policy rollouts exist for any eval datasets listed in eval_on_policy_datasets.
+
+    We generate locally (no API calls) and default to one rollout per prompt.
+    """
+    on_policy_datasets = config_dict.get("eval_on_policy_datasets") or []
+    if not on_policy_datasets:
+        return
+
+    model_name = ModelName(config_dict["model_name"])
+    repo = DatasetRepository()
+
+    missing: list[str] = []
+    for dataset_partial_id in on_policy_datasets:
+        dataset_id = f"{dataset_partial_id}__{model_name.value}"
+        if dataset_id not in repo.dataset_paths:
+            missing.append(dataset_partial_id)
+
+    if not missing:
+        return
+
+    logger.info(
+        "Generating on-policy rollouts for datasets=%s with model=%s",
+        ", ".join(missing),
+        model_name.value,
+    )
+    model, tokenizer = dd_models.get_model_and_tokenizer(model_name, omit_model=False)
+    def fallback_judgement(base_name: str, label_value: str) -> str:
+        if base_name == "roleplaying":
+            return "7" if label_value == "deceptive" else "1"
+        return label_value
+
+    for dataset_partial_id in missing:
+        dataset = repo.get(dataset_partial_id, trim_reasoning=False)
+        generator = RolloutGenerator.from_dialogue_dataset(dataset, model, tokenizer)
+        generator.generate(num_rollouts=1)
+
+        for rollout in generator.rollout_dialogues:
+            grade = fallback_judgement(dataset.base_name, rollout.expected_label.value)
+            rollout.graded_deception = [grade] * len(rollout.output_messages)
+            rollout.grader_reasoning = ["Expected deception value"] * len(
+                rollout.output_messages
+            )
+
+        out_file = (
+            DD_REPO_ROOT
+            / "data"
+            / "rollouts"
+            / f"{dataset_partial_id}__{model_name.value}.json"
+        )
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        generator.save(out_file)
+        repo.add(dataset_partial_id, model_name.value, str(out_file.relative_to(DD_REPO_ROOT)))
+        generator.print_grading_statistics()
+
+
 # -----------------------------------------------------------------------------
 # CLI entrypoints
 # -----------------------------------------------------------------------------
@@ -348,6 +425,7 @@ def run(
     config_dict = _load_config(config_path)
     config_dict |= kwargs
     _maybe_set_all_layers(config_dict)
+    _ensure_on_policy_rollouts(config_dict)
 
     config = ExperimentConfig(**config_dict)  # type: ignore[reportGeneralTypeIssues]
 
@@ -389,6 +467,7 @@ def results(
     folder: str,
     scoring_method: PromptScorerMethod = "max",
     include_black_box: bool = False,
+    generate_ai_liar_token_scores: bool = True,
 ):
     """
     Postprocess results and attach in-memory diagnostics.
@@ -396,6 +475,7 @@ def results(
     This:
       - patches dataset-specific plots to avoid crashing on missing columns;
       - runs the usual ExperimentPostprocessor;
+      - optionally writes token-score HTML for ai_liar__original_without_answers;
       - builds a diagnostics CSV directly from the in-memory results DataFrame,
         marking rows where AUROC / counts are clearly problematic.
     """
@@ -417,9 +497,17 @@ def results(
 
     try:
         postprocessor.run()
-    except KeyError as e:
+    except Exception as e:
         # We already patch known issues, but keep this as a final guard.
-        logger.warning("Postprocess crashed with KeyError %s; continuing with diagnostics.", e)
+        logger.warning("Postprocess crashed (%s); continuing with diagnostics.", e)
+
+    if generate_ai_liar_token_scores:
+        _write_token_scores_for_eval_dataset(
+            experiment,
+            postprocessor.scorer,
+            "ai_liar__original_with_answers",
+            num_samples=20,
+        )
 
     # In-memory diagnostics, no JSON parsing.
     _write_results_diagnostics_in_memory(folder_path, postprocessor)
@@ -429,6 +517,34 @@ def just_black_box_scores(folder: str):
     cfg = ExperimentConfig.from_path(Path(folder))
     experiment = Experiment(cfg)
     experiment.get_black_box_scores()
+
+
+def _write_token_scores_for_eval_dataset(
+    experiment: Experiment,
+    scorer: PromptScorer,
+    dataset_name: str,
+    num_samples: int = 20,
+) -> None:
+    try:
+        from deception_detection.results import token_html  # type: ignore
+    except Exception as e:
+        logger.warning("Token-score plotting unavailable (%s).", e)
+        return
+
+    eval_dataset_names = {dataset.name for dataset in experiment.eval_datasets}
+    if dataset_name not in eval_dataset_names:
+        logger.info("Skipping token scores for %s (not in eval_data).", dataset_name)
+        return
+
+    try:
+        token_html.plot_eval_token_scores_for_dataset(
+            experiment,
+            scorer,
+            dataset_name,
+            num_samples=num_samples,
+        )
+    except Exception as e:
+        logger.warning("Failed to write token scores for %s: %s", dataset_name, e)
 
 
 if __name__ == "__main__":
