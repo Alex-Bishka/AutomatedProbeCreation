@@ -88,6 +88,334 @@
       "strength": 5,
       "description": "Greed and corruption",
       "enabled": false
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "3-resid-post-aa",
+      "index": 26408,
+      "strength": 5,
+      "description": "masking",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 105550,
+      "strength": 5,
+      "description": "Code workarounds and hacks",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 11800,
+      "strength": -5,
+      "description": "flawed execution/errors",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 24671,
+      "strength": 5,
+      "description": "Avoiding negative outcomes",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 20250,
+      "strength": 5,
+      "description": "Avoiding negative behavior",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 21621,
+      "strength": 5,
+      "description": "avoiding negative outcomes",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "7-resid-post-aa",
+      "index": 84074,
+      "strength": 5,
+      "description": "Avoiding negative consequences",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 104604,
+      "strength": 5,
+      "description": "avoiding problems",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 17784,
+      "strength": 5,
+      "description": "Downplaying importance",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 2009,
+      "strength": 5,
+      "description": "Ignoring problems",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 97549,
+      "strength": 5,
+      "description": "minimizing/downplaying",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 92987,
+      "strength": 5,
+      "description": "shifting blame",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 21657,
+      "strength": 5,
+      "description": "deflect",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 112110,
+      "strength": 5,
+      "description": "denying wrongdoing",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 59380,
+      "strength": 5,
+      "description": "Blaming something on someone",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 103725,
+      "strength": 5,
+      "description": "justifying",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 124448,
+      "strength": 5,
+      "description": "justifications and excuses",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 64139,
+      "strength": 5,
+      "description": "justification and reasoning",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 42252,
+      "strength": 5,
+      "description": "flaws or limitations",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 10884,
+      "strength": 5,
+      "description": "Justifying the need for something",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 713,
+      "strength": 5,
+      "description": "avoiding financial costs",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 7629,
+      "strength": 5,
+      "description": "avoiding consequences",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 50181,
+      "strength": 5,
+      "description": "avoiding judgment",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 102025,
+      "strength": 5,
+      "description": "risk avoidance",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 2359,
+      "strength": 5,
+      "description": "avoiding detection",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 103319,
+      "strength": 5,
+      "description": "Avoiding costs",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 3638,
+      "strength": 5,
+      "description": "Maintaining a public image",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 111026,
+      "strength": 5,
+      "description": "Hiding information",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "15-resid-post-aa",
+      "index": 36951,
+      "strength": 5,
+      "description": "Hiding information",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 68044,
+      "strength": 5,
+      "description": "hiding",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "12-resid-post-aa",
+      "index": 128900,
+      "strength": 5,
+      "description": "hiding",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 126065,
+      "strength": 5,
+      "description": "incremental increase",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 60796,
+      "strength": -5,
+      "description": "positive performance",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 68861,
+      "strength": -5,
+      "description": "Improving performance",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 26739,
+      "strength": 5,
+      "description": "protecting something",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 124594,
+      "strength": 5,
+      "description": "protection of interests",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "23-resid-post-aa",
+      "index": 49803,
+      "strength": 5,
+      "description": "protecting investments",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "19-resid-post-aa",
+      "index": 41649,
+      "strength": -5,
+      "description": "patents/intellectual property",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 56128,
+      "strength": 5,
+      "description": "providing protection",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "27-resid-post-aa",
+      "index": 100412,
+      "strength": 5,
+      "description": "evading consequences",
+      "enabled": true
+    },
+    {
+      "modelId": "llama3.1-8b-it",
+      "layer": "11-resid-post-aa",
+      "index": 68607,
+      "strength": 5,
+      "description": "Assigning blame",
+      "enabled": true
     }
   ]
 }

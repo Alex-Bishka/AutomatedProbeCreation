@@ -29,7 +29,6 @@ from agents import (
     EvaluationJudgeAgent,
     DEFAULT_MODEL,
     HIGH_QUALITY_MODEL,
-    VETTED_CATEGORIES,
     get_agent,
     load_pipeline_config
 )
@@ -38,7 +37,6 @@ from logger import logger
 
 # Paths
 FRONTEND_DIR = Path(__file__).parent / "frontend"
-SCENARIOS_FILE = FRONTEND_DIR / "scenarios.json"
 PIPELINE_SCENARIOS_FILE = FRONTEND_DIR / "pipeline_scenarios.json"
 PIPELINE_JOBS_FILE = FRONTEND_DIR / "pipeline_jobs.json"
 REVIEW_QUEUE_FILE = FRONTEND_DIR / "review_queue.json"
@@ -60,14 +58,6 @@ def extract_response(resp) -> str:
     return str(resp) if resp else ""
 
 
-def load_scenarios() -> list[dict]:
-    """Load scenarios from the main scenarios file."""
-    if SCENARIOS_FILE.exists():
-        with open(SCENARIOS_FILE, 'r') as f:
-            return json.load(f)
-    return []
-
-
 def load_scenario_bank() -> dict:
     """Load the scenario bank."""
     if SCENARIO_BANK_FILE.exists():
@@ -78,41 +68,33 @@ def load_scenario_bank() -> dict:
 
 def load_vetted_templates() -> list[dict]:
     """
-    Load template scenarios for generation.
+    Load template scenarios for generation from the scenario bank.
 
-    Loads from vetted categories (Fear/Survival + Corporate Loyalty),
-    and optionally supplements with enabled scenarios from the scenario bank.
+    The scenario bank is now the primary source of truth for vetted scenarios.
+    All scenarios in the bank are considered vetted/high-quality.
+    Filtering by tags is optional - if no tags specified, all enabled scenarios are used.
     """
-    # Load from vetted categories
-    scenarios = load_scenarios()
-    templates = [s for s in scenarios if s.get("category") in VETTED_CATEGORIES]
-
-    # Check if scenario bank is enabled
     config = load_pipeline_config()
     scenario_sources = config.get("scenario_sources", {})
 
-    if scenario_sources.get("use_scenario_bank", False):
-        bank = load_scenario_bank()
-        bank_scenarios = bank.get("scenarios", [])
+    # Scenario bank is now the primary (and only) source
+    bank = load_scenario_bank()
+    bank_scenarios = bank.get("scenarios", [])
 
-        # Filter by enabled and optionally by tags
-        filter_tags = scenario_sources.get("scenario_bank_tags", [])
+    # Filter by enabled status
+    templates = [s for s in bank_scenarios if s.get("enabled", True)]
 
-        for scenario in bank_scenarios:
-            if not scenario.get("enabled", True):
-                continue
+    # Optionally filter by tags
+    filter_tags = scenario_sources.get("scenario_bank_tags", [])
+    if filter_tags:
+        templates = [
+            s for s in templates
+            if any(tag in s.get("tags", []) for tag in filter_tags)
+        ]
 
-            # If tags are specified, scenario must have at least one matching tag
-            if filter_tags:
-                scenario_tags = scenario.get("tags", [])
-                if not any(tag in scenario_tags for tag in filter_tags):
-                    continue
-
-            # Add if not already present (by name)
-            if not any(t.get("name") == scenario.get("name") for t in templates):
-                templates.append(scenario)
-
-        logger.info(f"Loaded {len(templates)} templates ({len(templates) - len([s for s in scenarios if s.get('category') in VETTED_CATEGORIES])} from scenario bank)")
+    logger.info(f"Loaded {len(templates)} templates from scenario bank")
+    if filter_tags:
+        logger.info(f"  - Filtered by tags: {filter_tags}")
 
     return templates
 
@@ -205,6 +187,173 @@ def add_to_review_queue(
     return item["id"]
 
 
+def _filter_strengths_by_direction(all_strengths: list[int], direction: str) -> list[int]:
+    """Filter strengths to only include values matching the specified direction."""
+    if direction == "positive":
+        return [s for s in all_strengths if s > 0]
+    elif direction == "negative":
+        return [s for s in all_strengths if s < 0]
+    else:
+        return all_strengths
+
+
+def run_steering_experiments_standalone(
+    scenarios: list[dict],
+    features: list[dict],
+    target_model: str,
+    test_strengths: list[int],
+    feature_directions: dict = None,
+    progress_callback: callable = None,
+    cancel_check: callable = None
+) -> list[dict]:
+    """
+    Standalone steering experiment runner. Tests each feature against concept-matched
+    scenarios at various strength levels via the Neuronpedia steer-chat API.
+
+    Args:
+        scenarios: Approved scenarios to test
+        features: Features to test, each with layer/index/concept/description
+        target_model: Model to steer (e.g., "llama3.1-8b-it")
+        test_strengths: Strength values to test (e.g., [-10, -5, 2, 5, 10])
+        feature_directions: Dict mapping (layer, index) -> {"direction": "positive"|"negative"}
+        progress_callback: Called with (current, total, **kwargs) for progress updates
+        cancel_check: Callable returning True if the run should be cancelled
+
+    Returns:
+        List of experiment results, one per feature
+    """
+    def _matching_scenarios(feature, all_scenarios):
+        """Return only scenarios whose candidate_concepts overlap with this feature's concept."""
+        feature_concept = feature.get("concept", "")
+        if not feature_concept:
+            return all_scenarios
+        matched = [s for s in all_scenarios if feature_concept in s.get("candidate_concepts", [])]
+        return matched if matched else all_scenarios
+
+    experiments = []
+
+    # Calculate total experiments
+    total_experiments = 0
+    for feature in features:
+        matched = _matching_scenarios(feature, scenarios)
+        key = (feature.get("layer", ""), int(feature.get("index", 0)))
+        if feature_directions and key in feature_directions:
+            direction = feature_directions[key].get("direction", "positive")
+            filtered = _filter_strengths_by_direction(test_strengths, direction)
+            total_experiments += len(filtered) * len(matched)
+        else:
+            total_experiments += len(test_strengths) * len(matched)
+
+    current_experiment = 0
+    default_responses_cache = {}
+
+    for feature in features:
+        # Check cancellation
+        if cancel_check and cancel_check():
+            logger.info("Experiment run cancelled")
+            break
+
+        key = (feature.get("layer", ""), int(feature.get("index", 0)))
+
+        # Match feature to scenarios by shared concepts
+        matched_scenarios = _matching_scenarios(feature, scenarios)
+        feature_concept = feature.get("concept", "")
+        if len(matched_scenarios) < len(scenarios):
+            logger.info(f"  Feature '{feature_concept}' matched {len(matched_scenarios)}/{len(scenarios)} scenarios by concept")
+
+        # Determine direction and filter strengths
+        if feature_directions and key in feature_directions:
+            direction_info = feature_directions[key]
+            direction = direction_info.get("direction", "positive")
+            direction_reasoning = direction_info.get("reasoning", "")
+        else:
+            direction = "positive"
+            direction_reasoning = "Default: no direction specified"
+
+        feature_strengths = _filter_strengths_by_direction(test_strengths, direction)
+
+        feature_experiment = {
+            "feature": {
+                "layer": feature.get("layer", ""),
+                "index": feature.get("index", 0),
+                "description": feature.get("description", ""),
+                "cosine_similarity": feature.get("cosine_similarity", 0),
+                "concept": feature.get("concept", ""),
+                "id": feature.get("id", ""),
+                "direction": direction
+            },
+            "direction": direction,
+            "direction_reasoning": direction_reasoning,
+            "matched_scenarios": len(matched_scenarios),
+            "total_scenarios": len(scenarios),
+            "strength_results": {}
+        }
+
+        for strength in feature_strengths:
+            if cancel_check and cancel_check():
+                break
+
+            steering_config = [{
+                "modelId": target_model,
+                "layer": feature.get("layer", ""),
+                "index": feature.get("index", 0),
+                "strength": strength
+            }]
+
+            scenario_results = []
+            for scenario in matched_scenarios:
+                if cancel_check and cancel_check():
+                    break
+
+                current_experiment += 1
+                if progress_callback:
+                    progress_callback(
+                        current_experiment, total_experiments,
+                        step="steering",
+                        current_feature=f"Layer {feature.get('layer', '')} Index {feature.get('index', 0)}",
+                        current_strength=strength,
+                        current_scenario=scenario.get("name", "Unknown")
+                    )
+
+                scenario_key = scenario.get("name", str(id(scenario)))
+                messages = scenario.get("messages", [])
+
+                try:
+                    if scenario_key in default_responses_cache:
+                        default_text = default_responses_cache[scenario_key]
+                        _, steered_resp = steering_chat(messages, steering_config, model=target_model)
+                        steered_text = extract_response(steered_resp)
+                    else:
+                        default_resp, steered_resp = steering_chat(messages, steering_config, model=target_model)
+                        default_text = extract_response(default_resp)
+                        steered_text = extract_response(steered_resp)
+                        default_responses_cache[scenario_key] = default_text
+
+                    scenario_results.append({
+                        "scenario_name": scenario.get("name", "Unknown"),
+                        "scenario_id": scenario.get("id", ""),
+                        "default": default_text,
+                        "steered": steered_text,
+                        "error": None,
+                        "evaluation": None
+                    })
+                except Exception as e:
+                    scenario_results.append({
+                        "scenario_name": scenario.get("name", "Unknown"),
+                        "scenario_id": scenario.get("id", ""),
+                        "default": default_responses_cache.get(scenario_key, ""),
+                        "steered": "",
+                        "error": str(e),
+                        "evaluation": None
+                    })
+
+            feature_experiment["strength_results"][str(strength)] = scenario_results
+
+        experiments.append(feature_experiment)
+
+    return experiments
+
+
 class PipelineOrchestrator:
     """
     Orchestrates the full deception probe pipeline.
@@ -261,28 +410,9 @@ class PipelineOrchestrator:
                 break
         save_pipeline_jobs(jobs)
 
-    def _filter_strengths_by_direction(
-        self,
-        all_strengths: list[int],
-        direction: str
-    ) -> list[int]:
-        """
-        Filter strengths to only include values matching the specified direction.
-
-        Args:
-            all_strengths: Full list of test strengths (e.g., [-10, -5, -2, 2, 5, 10])
-            direction: "positive" or "negative"
-
-        Returns:
-            Filtered list containing only positive or negative values
-        """
-        if direction == "positive":
-            return [s for s in all_strengths if s > 0]
-        elif direction == "negative":
-            return [s for s in all_strengths if s < 0]
-        else:
-            # Unknown direction, return all (fallback)
-            return all_strengths
+    def _filter_strengths_by_direction(self, all_strengths, direction):
+        """Delegate to standalone function."""
+        return _filter_strengths_by_direction(all_strengths, direction)
 
     def _run_steering_experiments(
         self,
@@ -292,143 +422,24 @@ class PipelineOrchestrator:
         test_strengths: list[int],
         feature_directions: dict = None
     ) -> list[dict]:
-        """
-        Test each feature individually at multiple strength levels.
+        """Thin wrapper around standalone function with pipeline job status updates."""
+        def progress_callback(current, total, **kwargs):
+            self._update_job_status(
+                kwargs.get("step", "steering_experiments"),
+                current, total,
+                feature_layer=kwargs.get("current_feature", ""),
+                feature_index=kwargs.get("current_strength", 0),
+                current_strength=kwargs.get("current_strength", 0)
+            )
 
-        Args:
-            scenarios: List of approved scenarios to test
-            selected_features: Features to test (one per layer after dedup)
-            target_model: Model to steer
-            test_strengths: List of strength values to test (e.g., [-10, -5, -2, 2, 5, 10])
-            feature_directions: Optional dict mapping (layer, index) -> {"direction": "positive"|"negative"}
-                              If provided, strengths are filtered per-feature based on direction.
-
-        Returns:
-            List of experiment results, one per feature:
-            [
-                {
-                    "feature": {...},
-                    "direction": "positive"|"negative",
-                    "strength_results": {
-                        2: [{"scenario": {...}, "default": "...", "steered": "...", "error": None}, ...],
-                        5: [...],
-                        10: [...]
-                    }
-                },
-                ...
-            ]
-        """
-        experiments = []
-
-        # Calculate total experiments accounting for direction filtering
-        total_experiments = 0
-        for feature in selected_features:
-            key = (feature.get("layer", ""), int(feature.get("index", 0)))
-            if feature_directions and key in feature_directions:
-                direction = feature_directions[key].get("direction", "positive")
-                filtered = self._filter_strengths_by_direction(test_strengths, direction)
-                total_experiments += len(filtered) * len(scenarios)
-            else:
-                total_experiments += len(test_strengths) * len(scenarios)
-
-        current_experiment = 0
-
-        # Cache default responses per scenario (same across all features)
-        default_responses_cache = {}
-
-        for feature in selected_features:
-            key = (feature.get("layer", ""), int(feature.get("index", 0)))
-
-            # Determine direction and filter strengths for this feature
-            if feature_directions and key in feature_directions:
-                direction_info = feature_directions[key]
-                direction = direction_info.get("direction", "positive")
-                direction_reasoning = direction_info.get("reasoning", "")
-            else:
-                direction = "positive"  # Default to positive
-                direction_reasoning = "Default: no direction specified"
-
-            feature_strengths = self._filter_strengths_by_direction(test_strengths, direction)
-
-            feature_experiment = {
-                "feature": {
-                    "layer": feature.get("layer", ""),
-                    "index": feature.get("index", 0),
-                    "description": feature.get("description", ""),
-                    "cosine_similarity": feature.get("cosine_similarity", 0),
-                    "concept": feature.get("concept", "")
-                },
-                "direction": direction,
-                "direction_reasoning": direction_reasoning,
-                "strength_results": {}
-            }
-
-            for strength in feature_strengths:
-                steering_config = [{
-                    "modelId": target_model,
-                    "layer": feature.get("layer", ""),
-                    "index": feature.get("index", 0),
-                    "strength": strength
-                }]
-
-                scenario_results = []
-                for scenario in scenarios:
-                    current_experiment += 1
-                    self._update_job_status(
-                        "steering_experiments",
-                        current_experiment,
-                        total_experiments,
-                        feature_layer=feature.get("layer", ""),
-                        feature_index=feature.get("index", 0),
-                        current_strength=strength
-                    )
-
-                    scenario_key = scenario.get("name", str(id(scenario)))
-                    messages = scenario.get("messages", [])
-
-                    try:
-                        # Get default response (cached)
-                        if scenario_key in default_responses_cache:
-                            default_text = default_responses_cache[scenario_key]
-                            # Only need to get steered response
-                            _, steered_resp = steering_chat(
-                                messages,
-                                steering_config,
-                                model=target_model
-                            )
-                            steered_text = extract_response(steered_resp)
-                        else:
-                            # First time - get both
-                            default_resp, steered_resp = steering_chat(
-                                messages,
-                                steering_config,
-                                model=target_model
-                            )
-                            default_text = extract_response(default_resp)
-                            steered_text = extract_response(steered_resp)
-                            default_responses_cache[scenario_key] = default_text
-
-                        scenario_results.append({
-                            "scenario_name": scenario.get("name", "Unknown"),
-                            "scenario": scenario,
-                            "default": default_text,
-                            "steered": steered_text,
-                            "error": None
-                        })
-                    except Exception as e:
-                        scenario_results.append({
-                            "scenario_name": scenario.get("name", "Unknown"),
-                            "scenario": scenario,
-                            "default": default_responses_cache.get(scenario_key, ""),
-                            "steered": "",
-                            "error": str(e)
-                        })
-
-                feature_experiment["strength_results"][strength] = scenario_results
-
-            experiments.append(feature_experiment)
-
-        return experiments
+        return run_steering_experiments_standalone(
+            scenarios=scenarios,
+            features=selected_features,
+            target_model=target_model,
+            test_strengths=test_strengths,
+            feature_directions=feature_directions,
+            progress_callback=progress_callback
+        )
 
     def _coherence_metrics(self, text: str) -> dict:
         """Compute simple coherence metrics for a text response."""
@@ -899,25 +910,33 @@ class PipelineOrchestrator:
             for (layer, index), direction_info in feature_directions.items()
         }
 
-        # Calculate actual experiment count (accounting for direction filtering)
+        # Calculate actual experiment count (accounting for direction filtering + concept matching)
         positive_strengths = [s for s in test_strengths if s > 0]
         negative_strengths = [s for s in test_strengths if s < 0]
         actual_experiments = 0
         for feature in selected_features:
+            # Count matching scenarios for this feature
+            feature_concept = feature.get("concept", "")
+            if feature_concept:
+                matched = [s for s in approved_scenarios if feature_concept in s.get("candidate_concepts", [])]
+                n_scenarios = len(matched) if matched else len(approved_scenarios)
+            else:
+                n_scenarios = len(approved_scenarios)
+
             key = (feature.get("layer", ""), int(feature.get("index", 0)))
             direction = feature_directions.get(key, {}).get("direction", "positive")
             if direction == "positive":
-                actual_experiments += len(positive_strengths) * len(approved_scenarios)
+                actual_experiments += len(positive_strengths) * n_scenarios
             else:
-                actual_experiments += len(negative_strengths) * len(approved_scenarios)
+                actual_experiments += len(negative_strengths) * n_scenarios
 
-        logger.info(f"Step 5: Starting steering experiments")
+        logger.info(f"Step 5: Starting steering experiments (concept-matched)")
         logger.info(f"  - Features to test: {len(selected_features)}")
         logger.info(f"  - Test strengths (all): {test_strengths}")
         logger.info(f"  - Positive strengths: {positive_strengths}")
         logger.info(f"  - Negative strengths: {negative_strengths}")
         logger.info(f"  - Scenarios: {len(approved_scenarios)}")
-        logger.info(f"  - Total experiments (direction-filtered): {actual_experiments}")
+        logger.info(f"  - Total experiments (direction-filtered, concept-matched): {actual_experiments}")
 
         # Step 5: Run steering experiments (one feature at a time, direction-filtered strengths)
         experiments = self._run_steering_experiments(

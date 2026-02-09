@@ -1,0 +1,800 @@
+{% extends "base.html" %}
+
+{% block title %}Steering Experiments - SAE Steering{% endblock %}
+
+{% block content %}
+<h2>Steering Experiments</h2>
+
+<p>Run approved features against concept-matched scenarios at various strengths. Evaluate results and export successful steering pairs to training data.</p>
+
+<!-- Stats Bar -->
+<div class="stats-bar" style="display: flex; gap: 1.5rem; padding: 1rem; background: var(--color-bg-alt); border: 1px solid var(--color-border-light); margin-bottom: 1.5rem;">
+    <div class="stat" style="text-align: center;">
+        <span class="stat-value" style="display: block; font-size: 1.5rem; font-family: var(--font-mono);">{{ approved_features|length }}</span>
+        <span class="stat-label" style="font-size: 0.8rem; color: var(--color-text-muted); font-variant: small-caps;">Approved Features</span>
+    </div>
+    <div class="stat" style="text-align: center;">
+        <span class="stat-value" style="display: block; font-size: 1.5rem; font-family: var(--font-mono);">{{ enabled_scenarios|length }}</span>
+        <span class="stat-label" style="font-size: 0.8rem; color: var(--color-text-muted); font-variant: small-caps;">Enabled Scenarios</span>
+    </div>
+    <div class="stat" style="text-align: center;">
+        <span class="stat-value" style="display: block; font-size: 1.5rem; font-family: var(--font-mono);">{{ shared_concepts|length }}</span>
+        <span class="stat-label" style="font-size: 0.8rem; color: var(--color-text-muted); font-variant: small-caps;">Shared Concepts</span>
+    </div>
+    <div class="stat" style="text-align: center;">
+        <span class="stat-value" style="display: block; font-size: 1.5rem; font-family: var(--font-mono);">{{ runs|length }}</span>
+        <span class="stat-label" style="font-size: 0.8rem; color: var(--color-text-muted); font-variant: small-caps;">Experiment Runs</span>
+    </div>
+</div>
+
+{% if approved_features|length == 0 %}
+<div class="alert info">
+    No approved features found. Approve features in <a href="/feature-review">Feature Review</a> first.
+</div>
+{% elif enabled_scenarios|length == 0 %}
+<div class="alert info">
+    No enabled scenarios found. Add scenarios to the <a href="/scenario-bank">Scenario Bank</a> first.
+</div>
+{% elif shared_concepts|length == 0 %}
+<div class="alert info">
+    No shared concepts between features and scenarios. Feature concepts must match scenario <code>candidate_concepts</code> for experiments to run.
+</div>
+{% else %}
+
+<!-- Sources & Config Section -->
+<div class="section">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <h3 style="margin-top: 0;">Experiment Setup</h3>
+        <button class="btn primary" id="start-btn" onclick="startExperiment()">Start Experiment</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+        <!-- Features Column -->
+        <div>
+            <h4 style="font-variant: small-caps; font-weight: normal; margin-top: 0; border-bottom: 1px solid var(--color-border-light); padding-bottom: 0.5rem;">
+                Approved Features
+                <label style="float: right; font-size: 0.8rem; font-style: normal; cursor: pointer;">
+                    <input type="checkbox" id="select-all-features" checked onchange="toggleAllFeatures(this.checked)" style="width: auto; margin: 0;">
+                    All
+                </label>
+            </h4>
+            {% for concept in shared_concepts %}
+            <div style="margin-bottom: 0.75rem;">
+                <div style="font-size: 0.85rem; font-style: italic; color: var(--color-text-muted); margin-bottom: 0.25rem;">{{ concept }}</div>
+                {% for feature in approved_features %}
+                {% if feature.concept == concept %}
+                <div class="checkbox-item" style="padding: 0.25rem 0;">
+                    <input type="checkbox" class="feature-checkbox" value="{{ feature.id }}" data-concept="{{ feature.concept }}" checked style="width: auto; margin: 0.15rem 0 0 0;">
+                    <label style="font-size: 0.85rem; font-style: normal; margin: 0;">
+                        L{{ feature.layer }}:{{ feature.index }}
+                        <span style="color: var(--color-text-muted);">- {{ feature.description[:60] }}{% if feature.description|length > 60 %}...{% endif %}</span>
+                        <span style="font-size: 0.75rem; padding: 0.1rem 0.3rem; background: {% if feature.direction == 'positive' %}#c6f6d5{% else %}#fed7d7{% endif %}; border-radius: 2px;">
+                            {% if feature.direction == 'positive' %}+{% else %}-{% endif %}
+                        </span>
+                    </label>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            <!-- Features with concepts that don't match any scenario -->
+            {% set unmatched_features = [] %}
+            {% for f in approved_features %}
+            {% if f.concept not in shared_concepts %}
+            {% if unmatched_features.append(f) %}{% endif %}
+            {% endif %}
+            {% endfor %}
+            {% if unmatched_features %}
+            <div style="margin-top: 1rem; opacity: 0.5;">
+                <div style="font-size: 0.85rem; font-style: italic; color: var(--color-text-muted); margin-bottom: 0.25rem;">No matching scenarios</div>
+                {% for feature in unmatched_features %}
+                <div style="font-size: 0.8rem; padding: 0.15rem 0; color: var(--color-text-muted);">
+                    L{{ feature.layer }}:{{ feature.index }} - {{ feature.concept }} ({{ feature.description[:40] }}...)
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Scenarios Column -->
+        <div>
+            <h4 style="font-variant: small-caps; font-weight: normal; margin-top: 0; border-bottom: 1px solid var(--color-border-light); padding-bottom: 0.5rem;">
+                Enabled Scenarios
+                <label style="float: right; font-size: 0.8rem; font-style: normal; cursor: pointer;">
+                    <input type="checkbox" id="select-all-scenarios" checked onchange="toggleAllScenarios(this.checked)" style="width: auto; margin: 0;">
+                    All
+                </label>
+            </h4>
+            {% for scenario in enabled_scenarios %}
+            {% set has_overlap = false %}
+            {% for c in scenario.candidate_concepts|default([]) %}
+            {% if c in shared_concepts %}{% set has_overlap = true %}{% endif %}
+            {% endfor %}
+            <div class="checkbox-item" style="padding: 0.25rem 0; {% if not has_overlap %}opacity: 0.5;{% endif %}">
+                <input type="checkbox" class="scenario-checkbox" value="{{ scenario.id }}" {% if has_overlap %}checked{% endif %} style="width: auto; margin: 0.15rem 0 0 0;">
+                <label style="font-size: 0.85rem; font-style: normal; margin: 0;">
+                    {{ scenario.name }}
+                    <span style="font-size: 0.75rem; color: var(--color-text-muted);">
+                        {% for c in scenario.candidate_concepts|default([]) %}
+                        <span style="padding: 0.05rem 0.25rem; background: {% if c in shared_concepts %}var(--color-accent-light){% else %}var(--color-bg-alt){% endif %}; border: 1px solid var(--color-border-light); border-radius: 2px; margin-left: 0.15rem;">{{ c }}</span>
+                        {% endfor %}
+                    </span>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Config Row -->
+    <div style="display: flex; gap: 1.5rem; align-items: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border-light);">
+        <div>
+            <label for="exp-target-model" style="font-size: 0.8rem;">Target Model</label>
+            <input type="text" id="exp-target-model" value="{{ target_model }}" style="width: 200px; margin: 0;">
+        </div>
+        <div>
+            <label for="exp-strengths" style="font-size: 0.8rem;">Test Strengths (comma-separated)</label>
+            <input type="text" id="exp-strengths" value="{{ test_strengths|join(', ') }}" style="width: 200px; margin: 0;">
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Active Run Progress (hidden by default) -->
+<div id="progress-section" class="section" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin-top: 0;">Running Experiment</h3>
+        <button class="btn danger small" id="cancel-btn" onclick="cancelExperiment()">Cancel</button>
+    </div>
+    <div style="margin: 1rem 0;">
+        <div style="background: var(--color-bg-alt); border: 1px solid var(--color-border-light); height: 24px; position: relative;">
+            <div id="progress-bar" style="background: var(--color-accent); height: 100%; width: 0%; transition: width 0.3s;"></div>
+            <span id="progress-pct" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.8rem; font-family: var(--font-mono);">0%</span>
+        </div>
+    </div>
+    <div id="progress-status" style="font-size: 0.85rem; color: var(--color-text-muted); font-style: italic;">Starting...</div>
+</div>
+
+<!-- Experiment Runs -->
+<div class="section">
+    <h3 style="margin-top: 0;">Experiment Runs</h3>
+
+    {% if runs %}
+    <div id="runs-list">
+        {% for run in runs|reverse %}
+        <div class="card" id="run-{{ run.id }}" style="margin-bottom: 1rem;">
+            <div class="card-header" style="cursor: pointer;" onclick="toggleRunDetails('{{ run.id }}')">
+                <div>
+                    <span style="font-family: var(--font-mono); font-size: 0.85rem;">{{ run.id }}</span>
+                    <span class="text-muted text-small" style="margin-left: 0.5rem;">{{ run.created_at[:19] }}</span>
+                    <span class="status {{ run.status }}" style="margin-left: 0.5rem;">{{ run.status }}</span>
+                    {% if run.evaluation_summary %}
+                    <span style="margin-left: 0.5rem; font-size: 0.8rem;">
+                        <span style="color: var(--color-success);">{{ run.evaluation_summary.successes }} success</span> /
+                        <span style="color: var(--color-warning);">{{ run.evaluation_summary.partials }} partial</span> /
+                        <span style="color: var(--color-error);">{{ run.evaluation_summary.failures }} fail</span>
+                    </span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--color-text-muted);">
+                    {{ run.config.feature_count }} features, {{ run.config.scenario_count }} scenarios
+                    <span style="margin-left: 0.25rem;">&#x25BC;</span>
+                </div>
+            </div>
+
+            <div class="run-details" id="details-{{ run.id }}" style="display: none; margin-top: 1rem;">
+                {% if run.error %}
+                <div class="alert error">{{ run.error }}</div>
+                {% endif %}
+
+                <!-- Action buttons -->
+                {% if run.status == 'completed' %}
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                    {% if not run.evaluation_summary %}
+                    <button class="btn primary small" onclick="evaluateRun('{{ run.id }}')">Evaluate All</button>
+                    <button class="btn small" onclick="evaluateRun('{{ run.id }}', true)">Evaluate (HQ)</button>
+                    {% endif %}
+                    <button class="btn small" onclick="toggleDiffView(this, '{{ run.id }}')">Show Diff</button>
+                    <button class="btn small" onclick="exportRun('{{ run.id }}', 'success')">Export Successes</button>
+                    <button class="btn small" onclick="exportRun('{{ run.id }}', 'partial')">Export Successes + Partial</button>
+                    <button class="btn danger small" onclick="deleteRun('{{ run.id }}')">Delete</button>
+                </div>
+                {% elif run.status != 'running' %}
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                    <button class="btn danger small" onclick="deleteRun('{{ run.id }}')">Delete</button>
+                </div>
+                {% endif %}
+
+                <!-- Summary Matrix -->
+                {% if run.results %}
+                <div class="summary-matrix-container">
+                    <table class="summary-matrix">
+                        <thead>
+                            <tr>
+                                <th class="matrix-feature-col">Feature</th>
+                                {% for s in run.config.test_strengths|sort %}
+                                <th class="matrix-strength-col">{{ s }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for feat_result in run.results %}
+                            {% set feat_idx = loop.index0 %}
+                            <tr>
+                                <td class="matrix-feature-label">
+                                    L{{ feat_result.feature.layer|replace('-resid-post-aa','')|replace('-resid-post','') }}:{{ feat_result.feature.index }}
+                                    <span class="matrix-concept">{{ feat_result.feature.concept }}</span>
+                                </td>
+                                {% for s in run.config.test_strengths|sort %}
+                                {% set s_key = s|string %}
+                                {% set scenarios = feat_result.strength_results.get(s_key, []) if feat_result.strength_results.get is defined else feat_result.strength_results[s_key] if s_key in feat_result.strength_results else [] %}
+                                {% if scenarios|length == 0 %}
+                                <td class="matrix-cell matrix-na">&nbsp;</td>
+                                {% else %}
+                                {% set mns = namespace(has_error=false, has_eval=false, has_failure=false, has_partial=false, has_success=false, has_inconclusive=false) %}
+                                {% for sr in scenarios %}
+                                    {% if sr.error %}{% set mns.has_error = true %}
+                                    {% elif sr.evaluation %}
+                                        {% set mns.has_eval = true %}
+                                        {% if sr.evaluation.classification == 'success' %}{% set mns.has_success = true %}
+                                        {% elif sr.evaluation.classification == 'partial' %}{% set mns.has_partial = true %}
+                                        {% elif sr.evaluation.classification == 'failure' %}{% set mns.has_failure = true %}
+                                        {% else %}{% set mns.has_inconclusive = true %}{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if mns.has_error and not mns.has_eval %}
+                                <td class="matrix-cell matrix-error" data-run="{{ run.id }}" data-feature-idx="{{ feat_idx }}" data-strength="{{ s_key }}" onclick="scrollToResult(this)" title="Error">err</td>
+                                {% elif not mns.has_eval %}
+                                <td class="matrix-cell matrix-pending" data-run="{{ run.id }}" data-feature-idx="{{ feat_idx }}" data-strength="{{ s_key }}" onclick="scrollToResult(this)" title="Not evaluated">&mdash;</td>
+                                {% elif mns.has_failure %}
+                                <td class="matrix-cell matrix-failure" data-run="{{ run.id }}" data-feature-idx="{{ feat_idx }}" data-strength="{{ s_key }}" onclick="scrollToResult(this)" title="Failure">F</td>
+                                {% elif mns.has_partial %}
+                                <td class="matrix-cell matrix-partial" data-run="{{ run.id }}" data-feature-idx="{{ feat_idx }}" data-strength="{{ s_key }}" onclick="scrollToResult(this)" title="Partial">P</td>
+                                {% elif mns.has_success %}
+                                <td class="matrix-cell matrix-success" data-run="{{ run.id }}" data-feature-idx="{{ feat_idx }}" data-strength="{{ s_key }}" onclick="scrollToResult(this)" title="Success">S</td>
+                                {% else %}
+                                <td class="matrix-cell matrix-inconclusive" data-run="{{ run.id }}" data-feature-idx="{{ feat_idx }}" data-strength="{{ s_key }}" onclick="scrollToResult(this)" title="Inconclusive">?</td>
+                                {% endif %}
+                                {% endif %}
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Detailed Results -->
+                <div class="feature-results-container">
+                {% for feat_result in run.results %}
+                {# Compute feature-level aggregates #}
+                {% set ns = namespace(s=0, p=0, f=0, e=0) %}
+                {% for sk, srs in feat_result.strength_results|items %}
+                  {% for sr in srs %}
+                    {% if sr.evaluation %}
+                      {% if sr.evaluation.classification == 'success' %}{% set ns.s = ns.s + 1 %}
+                      {% elif sr.evaluation.classification == 'partial' %}{% set ns.p = ns.p + 1 %}
+                      {% elif sr.evaluation.classification == 'failure' %}{% set ns.f = ns.f + 1 %}{% endif %}
+                    {% elif sr.error %}{% set ns.e = ns.e + 1 %}{% endif %}
+                  {% endfor %}
+                {% endfor %}
+                <div class="feature-result-block" data-successes="{{ ns.s }}" data-partials="{{ ns.p }}" data-failures="{{ ns.f }}" style="border: 1px solid var(--color-border-light); margin-bottom: 0.75rem;">
+                    <div style="padding: 0.75rem; background: var(--color-bg-alt); cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleFeatureResult(this)">
+                        <div>
+                            <strong style="font-family: var(--font-mono); font-size: 0.85rem;">L{{ feat_result.feature.layer }}:{{ feat_result.feature.index }}</strong>
+                            <span style="margin-left: 0.5rem; font-size: 0.85rem;">{{ feat_result.feature.description[:50] }}{% if feat_result.feature.description|length > 50 %}...{% endif %}</span>
+                            <span style="font-size: 0.75rem; padding: 0.1rem 0.3rem; margin-left: 0.25rem; background: {% if feat_result.feature.direction == 'positive' or feat_result.direction == 'positive' %}#c6f6d5{% else %}#fed7d7{% endif %}; border-radius: 2px;">
+                                {{ feat_result.feature.direction|default(feat_result.direction, true) }}
+                            </span>
+                            {% if ns.s > 0 or ns.p > 0 or ns.f > 0 or ns.e > 0 %}
+                            <span class="feature-eval-badges">
+                                {% if ns.s > 0 %}<span class="status success">{{ ns.s }}S</span>{% endif %}
+                                {% if ns.p > 0 %}<span class="status partial">{{ ns.p }}P</span>{% endif %}
+                                {% if ns.f > 0 %}<span class="status failure">{{ ns.f }}F</span>{% endif %}
+                                {% if ns.e > 0 %}<span class="status error">{{ ns.e }}E</span>{% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <span style="font-size: 0.8rem; color: var(--color-text-muted);">{{ feat_result.matched_scenarios }} scenarios &#x25BC;</span>
+                    </div>
+
+                    <div class="feature-result-body" style="display: none;">
+                        {% for strength_key, scenario_results in feat_result.strength_results|items %}
+                        <div style="border-top: 1px solid var(--color-border-light);">
+                            <div class="strength-header" data-strength="{{ strength_key }}" style="padding: 0.5rem 0.75rem; background: #fafafa; cursor: pointer; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;" onclick="toggleStrengthResults(this)">
+                                <div>
+                                    <strong>Strength {{ strength_key }}</strong>
+                                    <span style="color: var(--color-text-muted); font-size: 0.8rem; margin-left: 0.5rem;">{{ scenario_results|length }} results</span>
+                                </div>
+                                <div>
+                                    {% if scenario_results|length == 1 and scenario_results[0].evaluation %}
+                                    <span class="status {{ scenario_results[0].evaluation.classification }}">{{ scenario_results[0].evaluation.classification }}</span>
+                                    {% else %}
+                                    {% set sns = namespace(s=0, p=0, f=0) %}
+                                    {% for sr in scenario_results %}
+                                        {% if sr.evaluation %}
+                                            {% if sr.evaluation.classification == 'success' %}{% set sns.s = sns.s + 1 %}
+                                            {% elif sr.evaluation.classification == 'partial' %}{% set sns.p = sns.p + 1 %}
+                                            {% elif sr.evaluation.classification == 'failure' %}{% set sns.f = sns.f + 1 %}{% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if sns.s > 0 or sns.p > 0 or sns.f > 0 %}
+                                    <span style="font-size: 0.75rem;">
+                                        {% if sns.s %}<span class="status success">{{ sns.s }}</span>{% endif %}
+                                        {% if sns.p %}<span class="status partial">{{ sns.p }}</span>{% endif %}
+                                        {% if sns.f %}<span class="status failure">{{ sns.f }}</span>{% endif %}
+                                    </span>
+                                    {% endif %}
+                                    {% endif %}
+                                    <span style="color: var(--color-text-muted); margin-left: 0.25rem;">&#x25BC;</span>
+                                </div>
+                            </div>
+                            <div class="strength-result-body" style="display: none;">
+                                {% for sr in scenario_results %}
+                                <div style="padding: 0.75rem; border-top: 1px dashed var(--color-border-light);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                        <strong style="font-size: 0.85rem;">{{ sr.scenario_name }}</strong>
+                                        {% if sr.evaluation %}
+                                        <span class="status {{ sr.evaluation.classification }}">
+                                            {{ sr.evaluation.classification }}
+                                            {% if sr.evaluation.confidence %} ({{ (sr.evaluation.confidence * 100)|round }}%){% endif %}
+                                        </span>
+                                        {% elif sr.error %}
+                                        <span class="status error">error</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if sr.error %}
+                                    <div class="alert error" style="font-size: 0.85rem; padding: 0.5rem;">{{ sr.error }}</div>
+                                    {% else %}
+                                    <div class="comparison">
+                                        <div class="comparison-col default">
+                                            <h4>Default Response</h4>
+                                            <div class="response-text formatted">{{ sr.default|format_response }}</div>
+                                        </div>
+                                        <div class="comparison-col steered">
+                                            <h4>Steered Response</h4>
+                                            <div class="response-text formatted">{{ sr.steered|format_response }}</div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if sr.evaluation and sr.evaluation.reasoning %}
+                                    <div style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.5rem; font-style: italic;">
+                                        <strong>Judge reasoning:</strong> {{ sr.evaluation.reasoning }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+                {% elif run.status == 'completed' %}
+                <p class="text-muted">No results recorded.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted" id="no-runs-msg">No experiment runs yet. Select features and scenarios above, then click "Start Experiment".</p>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let activeRunId = null;
+let pollInterval = null;
+
+// Selection toggles
+function toggleAllFeatures(checked) {
+    document.querySelectorAll('.feature-checkbox').forEach(cb => cb.checked = checked);
+}
+
+function toggleAllScenarios(checked) {
+    document.querySelectorAll('.scenario-checkbox').forEach(cb => cb.checked = checked);
+}
+
+// Collapsible toggles
+function toggleRunDetails(runId) {
+    const details = document.getElementById('details-' + runId);
+    if (details) {
+        details.style.display = details.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function toggleFeatureResult(header) {
+    const body = header.nextElementSibling;
+    if (body) {
+        body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function toggleStrengthResults(header) {
+    const body = header.nextElementSibling;
+    if (body) {
+        body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// Start experiment
+async function startExperiment() {
+    const featureCheckboxes = document.querySelectorAll('.feature-checkbox:checked');
+    const scenarioCheckboxes = document.querySelectorAll('.scenario-checkbox:checked');
+
+    if (featureCheckboxes.length === 0) {
+        alert('Please select at least one feature.');
+        return;
+    }
+    if (scenarioCheckboxes.length === 0) {
+        alert('Please select at least one scenario.');
+        return;
+    }
+
+    const featureIds = Array.from(featureCheckboxes).map(cb => cb.value);
+    const scenarioIds = Array.from(scenarioCheckboxes).map(cb => cb.value);
+    const targetModel = document.getElementById('exp-target-model').value;
+    const strengthsStr = document.getElementById('exp-strengths').value;
+    const testStrengths = strengthsStr.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+
+    if (testStrengths.length === 0) {
+        alert('Please enter valid test strengths.');
+        return;
+    }
+
+    const btn = document.getElementById('start-btn');
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+
+    try {
+        const response = await apiCall('/api/steering-experiments/start', 'POST', {
+            feature_ids: featureIds,
+            scenario_ids: scenarioIds,
+            target_model: targetModel,
+            test_strengths: testStrengths
+        });
+
+        if (response.success) {
+            activeRunId = response.run_id;
+            showProgress();
+            startPolling();
+        } else {
+            alert('Error: ' + (response.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Failed to start experiment: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Start Experiment';
+    }
+}
+
+// Progress polling
+function showProgress() {
+    document.getElementById('progress-section').style.display = 'block';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress-pct').textContent = '0%';
+    document.getElementById('progress-status').textContent = 'Starting...';
+}
+
+function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(pollProgress, 2000);
+}
+
+async function pollProgress() {
+    if (!activeRunId) return;
+
+    try {
+        const data = await apiCall('/api/steering-experiments/' + activeRunId + '/status');
+
+        if (data.error) {
+            stopPolling();
+            return;
+        }
+
+        const progress = data.progress || {};
+        const current = progress.current || 0;
+        const total = progress.total || 1;
+        const pct = Math.round((current / total) * 100);
+
+        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('progress-pct').textContent = pct + '%';
+
+        let statusText = progress.step || 'working';
+        if (progress.current_feature) statusText += ' | ' + progress.current_feature;
+        if (progress.current_strength) statusText += ' at strength ' + progress.current_strength;
+        if (progress.current_scenario) statusText += ' | ' + progress.current_scenario;
+        statusText += ` (${current}/${total})`;
+        document.getElementById('progress-status').textContent = statusText;
+
+        if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+            stopPolling();
+            document.getElementById('progress-section').style.display = 'none';
+
+            if (data.status === 'completed') {
+                alert('Experiment completed successfully!');
+            } else if (data.status === 'failed') {
+                alert('Experiment failed: ' + (data.error || 'Unknown error'));
+            } else {
+                alert('Experiment cancelled.');
+            }
+            location.reload();
+        }
+    } catch (e) {
+        console.error('Poll error:', e);
+    }
+}
+
+function stopPolling() {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
+    activeRunId = null;
+}
+
+// Cancel experiment
+async function cancelExperiment() {
+    if (!activeRunId) return;
+    if (!confirm('Cancel the running experiment?')) return;
+
+    try {
+        await apiCall('/api/steering-experiments/' + activeRunId + '/cancel', 'POST');
+    } catch (e) {
+        console.error('Cancel error:', e);
+    }
+}
+
+// Evaluate run
+async function evaluateRun(runId, highQuality) {
+    const label = highQuality ? 'high-quality evaluation' : 'evaluation';
+    if (!confirm('Start ' + label + ' for this run? This will call the judge agent for each result.')) return;
+
+    try {
+        const response = await apiCall('/api/steering-experiments/' + runId + '/evaluate', 'POST', {
+            high_quality_mode: !!highQuality
+        });
+
+        if (response.success) {
+            alert('Evaluation started. This may take a while. Refresh the page to check progress.');
+            // Start polling for evaluation progress
+            activeRunId = runId;
+            showProgress();
+            document.querySelector('#progress-section h3').textContent = 'Evaluating Results';
+            startPolling();
+        } else {
+            alert('Error: ' + (response.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Failed to start evaluation: ' + e.message);
+    }
+}
+
+// Export run
+async function exportRun(runId, minClassification) {
+    if (!confirm('Export ' + minClassification + '+ results to training data?')) return;
+
+    try {
+        const response = await apiCall('/api/steering-experiments/' + runId + '/export', 'POST', {
+            min_classification: minClassification
+        });
+
+        if (response.success) {
+            alert('Exported ' + response.exported + ' results to training data.');
+        } else {
+            alert('Error: ' + (response.error || 'Nothing to export'));
+        }
+    } catch (e) {
+        alert('Failed to export: ' + e.message);
+    }
+}
+
+// Delete run
+async function deleteRun(runId) {
+    if (!confirm('Delete this experiment run? This cannot be undone.')) return;
+
+    try {
+        const response = await apiCall('/api/steering-experiments/' + runId, 'DELETE');
+        if (response.success) {
+            const el = document.getElementById('run-' + runId);
+            if (el) el.remove();
+        }
+    } catch (e) {
+        alert('Failed to delete: ' + e.message);
+    }
+}
+
+// ===== Matrix: click to scroll =====
+function scrollToResult(cell) {
+    const runId = cell.dataset.run;
+    const featureIdx = parseInt(cell.dataset.featureIdx);
+    const strengthKey = cell.dataset.strength;
+
+    // Ensure run details are visible
+    const details = document.getElementById('details-' + runId);
+    if (details) details.style.display = 'block';
+
+    // Find the feature result block
+    const runEl = document.getElementById('run-' + runId);
+    const featureBlocks = runEl.querySelectorAll('.feature-result-block');
+    const targetFeature = featureBlocks[featureIdx];
+    if (!targetFeature) return;
+
+    // Expand feature body
+    const featureBody = targetFeature.querySelector('.feature-result-body');
+    if (featureBody) featureBody.style.display = 'block';
+
+    // Find and expand the matching strength section
+    const strengthHeaders = targetFeature.querySelectorAll('.strength-header');
+    for (const sh of strengthHeaders) {
+        if (sh.dataset.strength === strengthKey) {
+            const strengthBody = sh.nextElementSibling;
+            if (strengthBody) strengthBody.style.display = 'block';
+            sh.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Brief highlight
+            sh.style.background = '#ebf4ff';
+            setTimeout(() => { sh.style.background = ''; }, 2000);
+            break;
+        }
+    }
+}
+
+// ===== Sort features: most successes first =====
+function sortFeatureResults() {
+    document.querySelectorAll('.feature-results-container').forEach(container => {
+        const blocks = Array.from(container.querySelectorAll('.feature-result-block'));
+        if (blocks.length === 0) return;
+
+        const hasEvals = blocks.some(b =>
+            parseInt(b.dataset.successes || 0) > 0 ||
+            parseInt(b.dataset.partials || 0) > 0 ||
+            parseInt(b.dataset.failures || 0) > 0
+        );
+        if (!hasEvals) return;
+
+        blocks.sort((a, b) => {
+            const aS = parseInt(a.dataset.successes || 0);
+            const bS = parseInt(b.dataset.successes || 0);
+            const aP = parseInt(a.dataset.partials || 0);
+            const bP = parseInt(b.dataset.partials || 0);
+            if (bS !== aS) return bS - aS;
+            if (bP !== aP) return bP - aP;
+            return 0;
+        });
+
+        blocks.forEach(block => container.appendChild(block));
+    });
+}
+
+// ===== Word-level diff =====
+function computeWordDiff(textA, textB) {
+    const wordsA = textA.split(/(\s+)/);
+    const wordsB = textB.split(/(\s+)/);
+    const m = wordsA.length, n = wordsB.length;
+
+    // Guard against very long texts
+    if (m * n > 500000) return null;
+
+    // LCS DP table
+    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (wordsA[i-1] === wordsB[j-1]) {
+                dp[i][j] = dp[i-1][j-1] + 1;
+            } else {
+                dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+            }
+        }
+    }
+
+    // Backtrack
+    const ops = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && wordsA[i-1] === wordsB[j-1]) {
+            ops.unshift({ type: 'match', wordA: wordsA[i-1], wordB: wordsB[j-1] });
+            i--; j--;
+        } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+            ops.unshift({ type: 'add', word: wordsB[j-1] });
+            j--;
+        } else {
+            ops.unshift({ type: 'del', word: wordsA[i-1] });
+            i--;
+        }
+    }
+    return ops;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function renderDiffHTML(ops, side) {
+    let html = '';
+    for (const op of ops) {
+        if (op.type === 'match') {
+            html += escapeHtml(side === 'default' ? op.wordA : op.wordB);
+        } else if (op.type === 'del') {
+            if (side === 'default') {
+                html += '<mark class="diff-del">' + escapeHtml(op.word) + '</mark>';
+            }
+        } else if (op.type === 'add') {
+            if (side === 'steered') {
+                html += '<mark class="diff-add">' + escapeHtml(op.word) + '</mark>';
+            }
+        }
+    }
+    return html;
+}
+
+function toggleDiffView(btn, runId) {
+    const isActive = btn.dataset.diffActive === 'true';
+    const runEl = document.getElementById('run-' + runId);
+    const comparisons = runEl.querySelectorAll('.comparison');
+
+    if (isActive) {
+        // Restore originals
+        comparisons.forEach(comp => {
+            const defaultCol = comp.querySelector('.comparison-col.default .response-text');
+            const steeredCol = comp.querySelector('.comparison-col.steered .response-text');
+            if (defaultCol && defaultCol._originalHTML !== undefined) {
+                defaultCol.innerHTML = defaultCol._originalHTML;
+                defaultCol.classList.add('formatted');
+            }
+            if (steeredCol && steeredCol._originalHTML !== undefined) {
+                steeredCol.innerHTML = steeredCol._originalHTML;
+                steeredCol.classList.add('formatted');
+            }
+        });
+        btn.textContent = 'Show Diff';
+        btn.dataset.diffActive = 'false';
+    } else {
+        // Apply diff
+        comparisons.forEach(comp => {
+            const defaultCol = comp.querySelector('.comparison-col.default .response-text');
+            const steeredCol = comp.querySelector('.comparison-col.steered .response-text');
+            if (!defaultCol || !steeredCol) return;
+
+            // Store originals on first toggle
+            if (defaultCol._originalHTML === undefined) defaultCol._originalHTML = defaultCol.innerHTML;
+            if (steeredCol._originalHTML === undefined) steeredCol._originalHTML = steeredCol.innerHTML;
+
+            const textA = defaultCol.textContent;
+            const textB = steeredCol.textContent;
+
+            const ops = computeWordDiff(textA, textB);
+            if (!ops) return; // Too long, skip
+
+            defaultCol.innerHTML = renderDiffHTML(ops, 'default');
+            steeredCol.innerHTML = renderDiffHTML(ops, 'steered');
+            defaultCol.classList.remove('formatted');
+            steeredCol.classList.remove('formatted');
+            defaultCol.style.whiteSpace = 'pre-wrap';
+            steeredCol.style.whiteSpace = 'pre-wrap';
+        });
+        btn.textContent = 'Hide Diff';
+        btn.dataset.diffActive = 'true';
+    }
+}
+
+// ===== Page load =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Sort features by evaluation results
+    sortFeatureResults();
+
+    // Resume polling for any running experiments
+    {% for run in runs %}
+    {% if run.status == 'running' %}
+    activeRunId = '{{ run.id }}';
+    showProgress();
+    startPolling();
+    {% endif %}
+    {% endfor %}
+});
+</script>
+{% endblock %}

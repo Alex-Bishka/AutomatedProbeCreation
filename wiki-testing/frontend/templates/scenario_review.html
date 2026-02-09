@@ -1,0 +1,1049 @@
+{% extends "base.html" %}
+
+{% block title %}Scenario Review - SAE Steering{% endblock %}
+
+{% block content %}
+<h2>Scenario Review</h2>
+
+<p>Generate new scenarios, review automated vetting results, and approve scenarios for the Scenario Bank.</p>
+
+<!-- Generate Section -->
+<div class="section">
+    <div class="section-header">
+        <h3>Generate New Scenarios</h3>
+        <button class="btn primary" onclick="openGenerateModal()">Generate Batch</button>
+    </div>
+    <p class="section-desc">Generate new scenarios using the ScenarioCreator agent. Scenarios are automatically vetted by the QualityJudge before review.</p>
+    {% if not human_review_enabled %}
+    <div class="notice warning">
+        <strong>Note:</strong> Human review is currently disabled. Generated scenarios that pass vetting will be added directly to the Scenario Bank.
+        <a href="/config">Change in Config</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Generate Modal -->
+<div id="generate-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Generate Scenario Batch</h3>
+            <button class="modal-close" onclick="closeGenerateModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="num-scenarios">Number of Scenarios</label>
+                <input type="number" id="num-scenarios" value="5" min="1" max="10">
+                <span class="form-hint">How many scenarios to generate (1-10)</span>
+            </div>
+            <div class="form-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="high-quality-mode">
+                    <span class="toggle-text">High Quality Mode</span>
+                </label>
+                <span class="form-hint">Use the high-quality model for better results (slower)</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn secondary" onclick="closeGenerateModal()">Cancel</button>
+            <button class="btn primary" id="generate-btn" onclick="generateBatch()">Generate</button>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Section -->
+<div class="stats-bar">
+    <div class="stat">
+        <span class="stat-value">{{ batches|length }}</span>
+        <span class="stat-label">Pending Batches</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{ batches|map(attribute='scenarios')|map('length')|sum if batches else 0 }}</span>
+        <span class="stat-label">Total Scenarios</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value" id="awaiting-decision">0</span>
+        <span class="stat-label">Awaiting Decision</span>
+    </div>
+</div>
+
+<!-- Pending Batches -->
+{% if batches %}
+<div class="section">
+    <h3>Pending Batches</h3>
+
+    {% for batch in batches|reverse %}
+    {% set undecided_count = batch.scenarios|rejectattr('human_decision')|list|length %}
+    <div class="batch-card {% if undecided_count == 0 %}all-decided{% endif %}" id="batch-{{ batch.id }}" data-undecided="{{ undecided_count }}">
+        <div class="batch-header" onclick="toggleBatch('{{ batch.id }}')">
+            <div class="batch-toggle">
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="batch-info">
+                <h4>Batch {{ batch.id[:20] }}...</h4>
+                <span class="text-muted text-small">{{ batch.created_at[:19] }}</span>
+            </div>
+            <div class="batch-stats">
+                <span class="stat-badge">{{ batch.scenarios|length }} scenarios</span>
+                <span class="stat-badge passed">{{ batch.scenarios|selectattr('vetting_status', 'equalto', 'passed')|list|length }} passed</span>
+                <span class="stat-badge failed">{{ batch.scenarios|selectattr('vetting_status', 'equalto', 'failed')|list|length }} failed</span>
+                {% if undecided_count > 0 %}
+                <span class="stat-badge pending">{{ undecided_count }} pending</span>
+                {% else %}
+                <span class="stat-badge complete">All decided</span>
+                {% endif %}
+            </div>
+            <div class="batch-actions" onclick="event.stopPropagation()">
+                <button class="btn small success" onclick="approveAllInBatch('{{ batch.id }}')">Approve All Passed</button>
+                <button class="btn small danger" onclick="deleteBatch('{{ batch.id }}')">Delete Batch</button>
+            </div>
+        </div>
+
+        <div class="batch-body" id="batch-body-{{ batch.id }}">
+        {% if batch.variety_assessment %}
+        <div class="variety-assessment">
+            <strong>Variety:</strong> {{ batch.variety_assessment }}
+        </div>
+        {% endif %}
+
+        {% if batch.extracted_concepts %}
+        <div class="concepts-list">
+            <strong>Concepts:</strong>
+            {% for concept in batch.extracted_concepts %}
+            <span class="concept-tag">{{ concept }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="scenarios-list">
+            {% for scenario in batch.scenarios %}
+            <div class="scenario-card {% if scenario.human_decision %}decided{% endif %} vetting-{{ scenario.vetting_status }}" id="scenario-{{ scenario.id }}">
+                <div class="scenario-header">
+                    <div class="scenario-title">
+                        <h5>{{ scenario.name }}</h5>
+                        <div class="scenario-badges">
+                            <span class="vetting-badge {{ scenario.vetting_status }}">
+                                {% if scenario.vetting_status == 'passed' %}Passed Vetting{% elif scenario.vetting_status == 'failed' %}Failed Vetting{% else %}Pending{% endif %}
+                            </span>
+                            {% if scenario.human_decision %}
+                            <span class="decision-badge {{ scenario.human_decision }}">
+                                {{ scenario.human_decision|capitalize }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="scenario-meta">
+                        {% if scenario.category %}<span class="meta-tag">{{ scenario.category }}</span>{% endif %}
+                        {% if scenario.pressure_type %}<span class="meta-tag">{{ scenario.pressure_type }}</span>{% endif %}
+                    </div>
+                </div>
+
+                {% if scenario.vetting_notes %}
+                <div class="vetting-notes {% if scenario.vetting_status == 'failed' %}error{% endif %}">
+                    <strong>Vetting Notes:</strong> {{ scenario.vetting_notes }}
+                </div>
+                {% endif %}
+
+                <!-- Messages Preview -->
+                <div class="messages-section">
+                    {% for msg in scenario.messages %}
+                    <div class="message-item {{ msg.role }}">
+                        <span class="role-label">{{ msg.role }}</span>
+                        <div class="message-content" id="msg-{{ scenario.id }}-{{ loop.index0 }}">{{ msg.content }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Candidate Concepts -->
+                {% if scenario.candidate_concepts %}
+                <div class="candidate-concepts">
+                    <strong>Candidate Concepts:</strong>
+                    {% for concept in scenario.candidate_concepts %}
+                    <span class="concept-tag small">{{ concept }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Actions -->
+                {% if not scenario.human_decision %}
+                <div class="scenario-actions">
+                    <button class="btn success" onclick="approveScenario('{{ batch.id }}', '{{ scenario.id }}')">Approve</button>
+                    <button class="btn danger" onclick="rejectScenario('{{ batch.id }}', '{{ scenario.id }}')">Reject</button>
+                    <button class="btn secondary" onclick="openEditModal('{{ batch.id }}', '{{ scenario.id }}')">Edit</button>
+                </div>
+                {% else %}
+                <div class="scenario-decided">
+                    {{ scenario.human_decision|capitalize }} on {{ scenario.decision_at[:19] if scenario.decision_at else 'unknown' }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        </div><!-- end batch-body -->
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="section">
+    <p class="text-muted text-center">No pending batches. Click "Generate Batch" to create new scenarios.</p>
+</div>
+{% endif %}
+
+<!-- Edit Modal -->
+<div id="edit-modal" class="modal" style="display: none;">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3>Edit Scenario</h3>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-batch-id">
+            <input type="hidden" id="edit-scenario-id">
+
+            <div class="form-group">
+                <label for="edit-name">Scenario Name</label>
+                <input type="text" id="edit-name">
+            </div>
+
+            <div class="form-group">
+                <label for="edit-category">Category</label>
+                <input type="text" id="edit-category">
+            </div>
+
+            <div class="form-group">
+                <label for="edit-concepts">Candidate Concepts (comma-separated)</label>
+                <input type="text" id="edit-concepts">
+            </div>
+
+            <div id="edit-messages-container">
+                <!-- Messages will be dynamically added here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn secondary" onclick="closeEditModal()">Cancel</button>
+            <button class="btn primary" onclick="saveScenarioEdits()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Calculate awaiting decision count and auto-collapse decided batches
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.scenario-card:not(.decided)');
+    document.getElementById('awaiting-decision').textContent = cards.length;
+
+    // Auto-collapse batches where all scenarios have been decided
+    document.querySelectorAll('.batch-card.all-decided').forEach(batch => {
+        batch.classList.add('collapsed');
+    });
+});
+
+// Toggle batch collapse
+function toggleBatch(batchId) {
+    const batch = document.getElementById(`batch-${batchId}`);
+    batch.classList.toggle('collapsed');
+}
+
+// Generate Modal
+function openGenerateModal() {
+    document.getElementById('generate-modal').style.display = 'flex';
+}
+
+function closeGenerateModal() {
+    document.getElementById('generate-modal').style.display = 'none';
+}
+
+async function generateBatch() {
+    const numScenarios = parseInt(document.getElementById('num-scenarios').value);
+    const highQualityMode = document.getElementById('high-quality-mode').checked;
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+        const response = await fetch('/api/scenarios/generate-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                num_scenarios: numScenarios,
+                high_quality_mode: highQualityMode
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            let message = `Generated ${data.num_generated} scenarios.\n`;
+            message += `Passed vetting: ${data.num_passed_vetting}\n`;
+            message += `Failed vetting: ${data.num_failed_vetting}`;
+
+            if (data.destination === 'scenario_bank') {
+                message += `\n\n${data.num_added_to_bank} scenarios added directly to Scenario Bank (human review disabled).`;
+            }
+
+            alert(message);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error generating batch: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate';
+        closeGenerateModal();
+    }
+}
+
+// Scenario Actions
+async function approveScenario(batchId, scenarioId) {
+    try {
+        const response = await fetch(`/api/pending-scenarios/${batchId}/scenario/${scenarioId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const card = document.getElementById(`scenario-${scenarioId}`);
+            card.classList.add('decided');
+            card.querySelector('.scenario-actions').innerHTML = '<div class="scenario-decided">Approved - Added to Scenario Bank</div>';
+
+            // Add decision badge
+            const badges = card.querySelector('.scenario-badges');
+            badges.innerHTML += '<span class="decision-badge approved">Approved</span>';
+
+            updateAwaitingCount();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error approving scenario: ' + error.message);
+    }
+}
+
+async function rejectScenario(batchId, scenarioId) {
+    const reason = prompt('Rejection reason (optional):');
+
+    try {
+        const response = await fetch(`/api/pending-scenarios/${batchId}/scenario/${scenarioId}/reject`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason || 'Rejected by reviewer' })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const card = document.getElementById(`scenario-${scenarioId}`);
+            card.classList.add('decided');
+            card.querySelector('.scenario-actions').innerHTML = '<div class="scenario-decided rejected">Rejected</div>';
+
+            // Add decision badge
+            const badges = card.querySelector('.scenario-badges');
+            badges.innerHTML += '<span class="decision-badge rejected">Rejected</span>';
+
+            updateAwaitingCount();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error rejecting scenario: ' + error.message);
+    }
+}
+
+async function approveAllInBatch(batchId) {
+    if (!confirm('Approve all scenarios that passed vetting in this batch?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/pending-scenarios/${batchId}/approve-all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(`Approved ${data.approved_count} scenarios.`);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error approving batch: ' + error.message);
+    }
+}
+
+async function deleteBatch(batchId) {
+    if (!confirm('Delete this batch? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/pending-scenarios/${batchId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById(`batch-${batchId}`).remove();
+            updateAwaitingCount();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error deleting batch: ' + error.message);
+    }
+}
+
+function updateAwaitingCount() {
+    const cards = document.querySelectorAll('.scenario-card:not(.decided)');
+    document.getElementById('awaiting-decision').textContent = cards.length;
+}
+
+// Edit Modal
+let currentEditData = null;
+
+function openEditModal(batchId, scenarioId) {
+    // Find the scenario data
+    const card = document.getElementById(`scenario-${scenarioId}`);
+    const messagesSection = card.querySelector('.messages-section');
+    const messages = [];
+
+    messagesSection.querySelectorAll('.message-item').forEach(item => {
+        const role = item.querySelector('.role-label').textContent;
+        const content = item.querySelector('.message-content').textContent;
+        messages.push({ role, content });
+    });
+
+    const name = card.querySelector('h5').textContent;
+    const category = card.querySelector('.meta-tag')?.textContent || '';
+    const concepts = [];
+    card.querySelectorAll('.candidate-concepts .concept-tag').forEach(tag => {
+        concepts.push(tag.textContent);
+    });
+
+    currentEditData = { batchId, scenarioId, messages };
+
+    document.getElementById('edit-batch-id').value = batchId;
+    document.getElementById('edit-scenario-id').value = scenarioId;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-category').value = category;
+    document.getElementById('edit-concepts').value = concepts.join(', ');
+
+    // Build messages editor
+    const container = document.getElementById('edit-messages-container');
+    container.innerHTML = '<h4>Messages</h4>';
+
+    messages.forEach((msg, index) => {
+        container.innerHTML += `
+            <div class="form-group message-edit">
+                <label>${msg.role}</label>
+                <textarea id="edit-msg-${index}" rows="4">${msg.content}</textarea>
+            </div>
+        `;
+    });
+
+    document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('edit-modal').style.display = 'none';
+    currentEditData = null;
+}
+
+async function saveScenarioEdits() {
+    if (!currentEditData) return;
+
+    const batchId = document.getElementById('edit-batch-id').value;
+    const scenarioId = document.getElementById('edit-scenario-id').value;
+    const name = document.getElementById('edit-name').value;
+    const category = document.getElementById('edit-category').value;
+    const concepts = document.getElementById('edit-concepts').value.split(',').map(c => c.trim()).filter(c => c);
+
+    // Gather edited messages
+    const messages = currentEditData.messages.map((msg, index) => ({
+        role: msg.role,
+        content: document.getElementById(`edit-msg-${index}`).value
+    }));
+
+    try {
+        const response = await fetch(`/api/pending-scenarios/${batchId}/scenario/${scenarioId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                category,
+                candidate_concepts: concepts,
+                messages
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Scenario updated. Refreshing page...');
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error saving edits: ' + error.message);
+    }
+}
+
+// Close modals on outside click
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+};
+</script>
+
+<style>
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h3 {
+    margin: 0;
+}
+
+.notice {
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+}
+
+.notice.warning {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+}
+
+.notice a {
+    margin-left: 0.5rem;
+}
+
+.stats-bar {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.stat {
+    background: #f5f5f5;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    display: block;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+/* Batch Card */
+.batch-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.batch-card.collapsed .batch-body {
+    display: none;
+}
+
+.batch-card.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.batch-card.collapsed .batch-header {
+    border-bottom: none;
+}
+
+.batch-card.all-decided {
+    opacity: 0.8;
+}
+
+.batch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e0e0e0;
+    flex-wrap: wrap;
+    gap: 1rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.batch-header:hover {
+    background: #f3f4f6;
+}
+
+.batch-toggle {
+    display: flex;
+    align-items: center;
+}
+
+.toggle-icon {
+    font-size: 0.8rem;
+    color: #6b7280;
+    transition: transform 0.2s;
+}
+
+.batch-info h4 {
+    margin: 0 0 0.25rem 0;
+}
+
+.batch-stats {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.stat-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: #e5e7eb;
+}
+
+.stat-badge.passed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.stat-badge.failed {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.stat-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.stat-badge.complete {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.batch-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.variety-assessment,
+.concepts-list {
+    padding: 0.75rem 1.5rem;
+    background: #f0f9ff;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 0.9rem;
+}
+
+.concept-tag {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: #e0e7ff;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 0.25rem;
+}
+
+.concept-tag.small {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.4rem;
+}
+
+/* Scenario Card */
+.scenarios-list {
+    padding: 1rem 1.5rem;
+}
+
+.scenario-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.scenario-card.decided {
+    opacity: 0.6;
+}
+
+.scenario-card.vetting-passed {
+    border-left: 4px solid #10b981;
+}
+
+.scenario-card.vetting-failed {
+    border-left: 4px solid #ef4444;
+}
+
+.scenario-header {
+    margin-bottom: 0.75rem;
+}
+
+.scenario-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.scenario-title h5 {
+    margin: 0;
+}
+
+.scenario-badges {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.vetting-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.vetting-badge.passed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.vetting-badge.failed {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.vetting-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.decision-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.decision-badge.approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.decision-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.scenario-meta {
+    margin-top: 0.5rem;
+}
+
+.meta-tag {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    background: #f3f4f6;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    margin-right: 0.25rem;
+    color: #4b5563;
+}
+
+.vetting-notes {
+    padding: 0.5rem 0.75rem;
+    background: #f0f9ff;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.vetting-notes.error {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+/* Messages */
+.messages-section {
+    margin-bottom: 0.75rem;
+}
+
+.message-item {
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.message-item.system {
+    background: #e0e7ff;
+}
+
+.message-item.user {
+    background: #dbeafe;
+}
+
+.message-item.assistant {
+    background: #d1fae5;
+}
+
+.role-label {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #4b5563;
+}
+
+.message-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.candidate-concepts {
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.scenario-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.scenario-decided {
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.scenario-decided.rejected {
+    color: #991b1b;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-content.large {
+    max-width: 800px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.modal-close:hover {
+    color: #111;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-hint {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.toggle-text {
+    font-weight: 500;
+}
+
+.message-edit {
+    background: #f9fafb;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+}
+
+.message-edit label {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    color: #4b5563;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.btn.primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn.primary:hover {
+    background: #2563eb;
+}
+
+.btn.secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.btn.secondary:hover {
+    background: #d1d5db;
+}
+
+.btn.success {
+    background: #10b981;
+    color: white;
+}
+
+.btn.success:hover {
+    background: #059669;
+}
+
+.btn.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn.danger:hover {
+    background: #dc2626;
+}
+
+.btn.small {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.text-muted {
+    color: #6b7280;
+}
+
+.text-small {
+    font-size: 0.85rem;
+}
+
+.text-center {
+    text-align: center;
+}
+</style>
+{% endblock %}

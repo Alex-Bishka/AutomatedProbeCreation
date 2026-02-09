@@ -43,7 +43,9 @@
     {% if scenarios %}
     <div class="scenario-list" id="scenario-list">
         {% for scenario in scenarios %}
-        <div class="scenario-card {% if not scenario.enabled %}disabled{% endif %}" data-tags="{{ scenario.tags|join(',') }}" id="scenario-{{ scenario.id }}">
+        {% set cat = cat_lookup.get(scenario.category) or cat_lookup_by_name.get(scenario.category) or cat_lookup_by_name.get(scenario.category|lower if scenario.category else '') %}
+        {% set cat_color = cat.color if cat else '#888' %}
+        <div class="scenario-card {% if not scenario.enabled %}disabled{% endif %}" data-tags="{{ scenario.tags|join(',') }}" id="scenario-{{ scenario.id }}" style="border-left: 3px solid {{ cat_color }};">
             <div class="scenario-header" onclick="toggleExpand(this)">
                 <div class="scenario-title">
                     <span class="expand-icon">+</span>
@@ -53,7 +55,8 @@
                     {% endif %}
                 </div>
                 <div class="scenario-meta">
-                    <span class="category-tag">{{ scenario.category or 'Uncategorized' }}</span>
+                    <span class="category-color" style="background: {{ cat_color }};"></span>
+                    <span class="category-tag" style="background: {{ cat_color }}20; color: {{ cat_color }}; border: 1px solid {{ cat_color }}40;">{{ scenario.category or 'Uncategorized' }}</span>
                     {% if not scenario.enabled %}
                     <span class="status-badge disabled">Disabled</span>
                     {% endif %}
@@ -136,6 +139,8 @@
             <p>Select scenarios to add to your bank:</p>
             <div class="import-list">
                 {% for scenario in pipeline_scenarios %}
+                {% set cat = cat_lookup.get(scenario.category) or cat_lookup_by_name.get(scenario.category) or cat_lookup_by_name.get(scenario.category|lower if scenario.category else '') %}
+                {% set cat_color = cat.color if cat else '#888' %}
                 <div class="import-item">
                     <label>
                         <input type="checkbox" name="import" value="{{ loop.index0 }}" data-scenario='{{ scenario|tojson }}'>
@@ -144,7 +149,8 @@
                         <span class="quality-badge">{{ (scenario.quality_score * 100)|round(0) }}%</span>
                         {% endif %}
                         <br>
-                        <span class="text-muted text-small">{{ scenario.category or 'Uncategorized' }}</span>
+                        <span class="category-color" style="background: {{ cat_color }}; vertical-align: middle;"></span>
+                        <span class="text-small" style="color: {{ cat_color }};">{{ scenario.category or 'Uncategorized' }}</span>
                     </label>
                 </div>
                 {% else %}
@@ -351,8 +357,6 @@ async function deleteScenario(scenarioId) {
 }
 
 .category-tag {
-    background: #e0e7ff;
-    color: #3730a3;
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -404,28 +408,30 @@ async function deleteScenario(scenarioId) {
 .message {
     padding: 0.75rem;
     margin: 0.5rem 0;
-    border-radius: 4px;
+    border-left: 3px solid var(--color-border);
+    background: var(--color-bg-alt);
 }
 
 .message.system {
-    background: #e0e7ff;
-    border-left: 3px solid #6366f1;
+    background: #fffbeb;
+    border-left-color: var(--color-warning);
 }
 
 .message.user {
-    background: #dbeafe;
-    border-left: 3px solid #3b82f6;
+    background: var(--color-accent-light);
+    border-left-color: var(--color-accent);
 }
 
 .message.assistant {
-    background: #d1fae5;
-    border-left: 3px solid #10b981;
+    background: #f0fff4;
+    border-left-color: var(--color-success);
 }
 
 .role-badge {
-    font-weight: bold;
-    text-transform: uppercase;
-    font-size: 0.7rem;
+    font-variant: small-caps;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
     display: block;
     margin-bottom: 0.25rem;
 }

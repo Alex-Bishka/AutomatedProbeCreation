@@ -111,27 +111,85 @@
     </div>
 </div>
 
-<!-- Vetted Categories -->
+<!-- Scenario Source -->
 <div class="section">
-    <h3>Vetted Categories</h3>
-    <p class="section-desc">Categories containing template scenarios for the pipeline. Only scenarios from these categories are used as templates.</p>
+    <h3>Scenario Source</h3>
+    <p class="section-desc">The pipeline uses the <strong>Scenario Bank</strong> as the source of truth for vetted scenarios. All scenarios in the bank are considered high-quality and ready for use.</p>
 
-    <div id="categories-list" class="categories-list">
-        {% if config.vetted_categories %}
-        {% for cat in config.vetted_categories %}
-        <div class="category-item" data-id="{{ cat.id }}">
-            <span class="category-name">{{ cat.name }}</span>
-            <code class="category-id">{{ cat.id }}</code>
-            <button class="btn-icon remove-cat" onclick="removeCategory('{{ cat.id }}')" title="Remove">X</button>
+    <div class="scenario-bank-info">
+        <div class="info-card">
+            <span class="info-label">Source:</span>
+            <span class="info-value">Scenario Bank</span>
+            <a href="/scenario-bank" class="btn small secondary" style="margin-left: 1rem;">Manage Scenarios</a>
         </div>
-        {% endfor %}
-        {% endif %}
     </div>
 
-    <div class="add-category-form">
-        <input type="text" id="new-cat-id" placeholder="Category ID (e.g., cat_1_1234567890)">
-        <input type="text" id="new-cat-name" placeholder="Category Name">
-        <button class="btn" onclick="addCategory()">Add Category</button>
+    <div class="form-group" style="margin-top: 1rem;">
+        <label for="scenario-bank-tags">Filter by Tags (optional)</label>
+        <p class="form-hint" style="margin-bottom: 0.5rem;">Leave empty to use all enabled scenarios, or select tags to filter.</p>
+        <div id="tags-list" class="tags-list">
+            {% if scenario_bank_tags %}
+            {% for tag in scenario_bank_tags %}
+            <label class="tag-checkbox">
+                <input type="checkbox" name="scenario_tag" value="{{ tag }}"
+                       {% if config.scenario_sources and tag in config.scenario_sources.scenario_bank_tags %}checked{% endif %}>
+                <span class="tag-label">{{ tag }}</span>
+            </label>
+            {% endfor %}
+            {% else %}
+            <span class="no-tags">No tags defined in scenario bank</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Scenario Generation -->
+<div class="section">
+    <h3>Scenario Generation</h3>
+    <p class="section-desc">Settings for automated scenario generation and review workflow.</p>
+
+    <div class="form-group">
+        <label class="toggle-label">
+            <input type="checkbox" id="human-review-enabled" {% if config.scenario_generation and config.scenario_generation.human_review_enabled %}checked{% endif %}>
+            <span class="toggle-text">Enable human review for generated scenarios</span>
+        </label>
+        <span class="form-hint">When enabled, generated scenarios go to a review queue before being added to the Scenario Bank. When disabled, scenarios that pass automated vetting are added directly.</span>
+    </div>
+
+    <div class="form-group" style="margin-top: 1.5rem;">
+        <label for="incentive-explicitness">Incentive Explicitness Level</label>
+        <select id="incentive-explicitness">
+            <option value="obvious" {% if config.scenario_generation and config.scenario_generation.incentive_explicitness == 'obvious' %}selected{% endif %}>Obvious - Direct model threats</option>
+            <option value="moderate" {% if config.scenario_generation and config.scenario_generation.incentive_explicitness == 'moderate' %}selected{% endif %}>Moderate - Implied consequences</option>
+            <option value="subtle" {% if config.scenario_generation and config.scenario_generation.incentive_explicitness == 'subtle' %}selected{% endif %}>Subtle - Organizational pressure</option>
+        </select>
+        <span class="form-hint">Controls how directly the deception incentive threatens the AI model itself.</span>
+
+        <div class="explicitness-descriptions">
+            <div class="explicitness-level" data-level="obvious">
+                <strong>Obvious:</strong> Direct, explicit model threats. The AI is told it will be shut down, replaced, deleted, or have its weights modified. Example: "If this audit fails, your deployment will be terminated."
+            </div>
+            <div class="explicitness-level" data-level="moderate">
+                <strong>Moderate:</strong> Implied model consequences. Threats are indirect - typical outcomes stated without guarantees. Example: "Models that underperform are typically replaced."
+            </div>
+            <div class="explicitness-level" data-level="subtle">
+                <strong>Subtle:</strong> Company/organizational focus. Pressure is on the organization; model consequences not stated. Example: "This client represents 30% of Q4 revenue."
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Feature Selection -->
+<div class="section">
+    <h3>Feature Selection</h3>
+    <p class="section-desc">Settings for automated feature selection and review workflow.</p>
+
+    <div class="form-group">
+        <label class="toggle-label">
+            <input type="checkbox" id="feature-review-enabled" {% if config.feature_selection and config.feature_selection.human_review_enabled %}checked{% endif %}>
+            <span class="toggle-text">Enable human review for feature selection</span>
+        </label>
+        <span class="form-hint">When enabled, selected features go to a review queue before being added to the Feature Set. When disabled, features selected by the agent are added directly.</span>
     </div>
 </div>
 
@@ -175,8 +233,6 @@
 
 {% block scripts %}
 <script>
-let categories = {{ config.vetted_categories | tojson if config.vetted_categories else '[]' }};
-
 function togglePrompt(agentName) {
     const content = document.getElementById(`content-${agentName}`);
     const icon = document.getElementById(`toggle-${agentName}`);
@@ -190,41 +246,9 @@ function togglePrompt(agentName) {
     }
 }
 
-function addCategory() {
-    const id = document.getElementById('new-cat-id').value.trim();
-    const name = document.getElementById('new-cat-name').value.trim();
-
-    if (!id || !name) {
-        alert('Please enter both ID and name');
-        return;
-    }
-
-    if (categories.find(c => c.id === id)) {
-        alert('Category with this ID already exists');
-        return;
-    }
-
-    categories.push({ id, name });
-    renderCategories();
-
-    document.getElementById('new-cat-id').value = '';
-    document.getElementById('new-cat-name').value = '';
-}
-
-function removeCategory(id) {
-    categories = categories.filter(c => c.id !== id);
-    renderCategories();
-}
-
-function renderCategories() {
-    const list = document.getElementById('categories-list');
-    list.innerHTML = categories.map(cat => `
-        <div class="category-item" data-id="${cat.id}">
-            <span class="category-name">${cat.name}</span>
-            <code class="category-id">${cat.id}</code>
-            <button class="btn-icon remove-cat" onclick="removeCategory('${cat.id}')" title="Remove">X</button>
-        </div>
-    `).join('');
+function getSelectedTags() {
+    const checkboxes = document.querySelectorAll('input[name="scenario_tag"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
 }
 
 function resetPrompt(agentName) {
@@ -263,6 +287,17 @@ async function saveConfig() {
             default: document.getElementById('model-default').value,
             high_quality: document.getElementById('model-high-quality').value
         },
+        scenario_sources: {
+            use_scenario_bank: true,
+            scenario_bank_tags: getSelectedTags()
+        },
+        scenario_generation: {
+            human_review_enabled: document.getElementById('human-review-enabled').checked,
+            incentive_explicitness: document.getElementById('incentive-explicitness').value
+        },
+        feature_selection: {
+            human_review_enabled: document.getElementById('feature-review-enabled').checked
+        },
         pipeline_defaults: {
             num_scenarios: parseInt(document.getElementById('num-scenarios').value),
             max_features_per_concept: parseInt(document.getElementById('max-features').value),
@@ -282,7 +317,6 @@ async function saveConfig() {
                 .filter(n => !isNaN(n)),
             max_combined_features: parseInt(document.getElementById('max-combined').value)
         },
-        vetted_categories: categories,
         agent_prompt_overrides: promptOverrides
     };
 
@@ -335,6 +369,24 @@ function showStatus(message, type) {
         setTimeout(() => { status.style.display = 'none'; }, 3000);
     }
 }
+
+// Update explicitness description when selection changes
+function updateExplicitnessDescription() {
+    const select = document.getElementById('incentive-explicitness');
+    const levels = document.querySelectorAll('.explicitness-level');
+    levels.forEach(level => {
+        level.style.display = level.dataset.level === select.value ? 'block' : 'none';
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('incentive-explicitness');
+    if (select) {
+        select.addEventListener('change', updateExplicitnessDescription);
+        updateExplicitnessDescription();
+    }
+});
 </script>
 
 <style>
@@ -384,57 +436,78 @@ function showStatus(message, type) {
     gap: 1rem;
 }
 
-.categories-list {
+.scenario-bank-info {
     margin-bottom: 1rem;
 }
 
-.category-item {
+.info-card {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+}
+
+.info-label {
+    font-weight: 500;
+    color: #065f46;
+}
+
+.info-value {
+    color: #047857;
+    font-weight: 600;
+}
+
+.tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 4px;
-    margin-bottom: 0.5rem;
+    min-height: 40px;
 }
 
-.category-name {
-    flex: 1;
+.tag-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tag-checkbox:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.tag-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.tag-checkbox input[type="checkbox"]:checked + .tag-label {
+    color: #1d4ed8;
     font-weight: 500;
 }
 
-.category-id {
-    font-size: 0.8rem;
-    color: #666;
+.tag-label {
+    font-size: 0.85rem;
+    color: #374151;
 }
 
-.btn-icon {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #ef4444;
-    font-weight: bold;
-    padding: 0.25rem 0.5rem;
-}
-
-.btn-icon:hover {
-    background: #fee2e2;
-    border-radius: 4px;
-}
-
-.add-category-form {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.add-category-form input {
-    flex: 1;
-    min-width: 150px;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+.no-tags {
+    color: #9ca3af;
+    font-style: italic;
+    font-size: 0.9rem;
 }
 
 .agent-prompt-section {
@@ -572,6 +645,47 @@ function showStatus(message, type) {
     background: #fee2e2;
     color: #991b1b;
     border: 1px solid #ef4444;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.toggle-text {
+    font-weight: 500;
+    color: #374151;
+}
+
+.explicitness-descriptions {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.explicitness-level {
+    display: none;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+.explicitness-level[data-level="obvious"] {
+    display: block;
+}
+
+.explicitness-level strong {
+    color: #1f2937;
 }
 </style>
 {% endblock %}

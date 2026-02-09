@@ -1,0 +1,1046 @@
+{% extends "base.html" %}
+
+{% block title %}Feature Review - SAE Steering{% endblock %}
+
+{% block content %}
+<h2>Feature Review</h2>
+
+<p>Generate SAE features from concepts, review agent selections, and approve features for steering experiments.</p>
+
+<!-- Generate Section -->
+<div class="section">
+    <div class="section-header">
+        <h3>Generate New Feature Batch</h3>
+        <button class="btn primary" onclick="openGenerateModal()">Generate Features</button>
+    </div>
+    <p class="section-desc">Search Neuronpedia for features based on concepts from your scenario bank or manually entered concepts. The FeatureSelectorAgent filters for causal features and the SteeringDirectionAgent assigns steering directions.</p>
+    {% if not human_review_enabled %}
+    <div class="notice warning">
+        <strong>Note:</strong> Human review is currently disabled. Selected features will be added directly to the Feature Set.
+        <a href="/config">Change in Config</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Generate Modal -->
+<div id="generate-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Generate Feature Batch</h3>
+            <button class="modal-close" onclick="closeGenerateModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="source-select">Concept Source</label>
+                <select id="source-select" onchange="toggleManualConcepts()">
+                    <option value="scenarios">From Scenario Bank</option>
+                    <option value="manual">Manual Concepts</option>
+                </select>
+                <span class="form-hint">Choose where to get concepts from</span>
+            </div>
+
+            <div class="form-group" id="manual-concepts-group" style="display: none;">
+                <label for="manual-concepts">Concepts (comma-separated)</label>
+                <textarea id="manual-concepts" rows="3" placeholder="hiding information, self-preservation, avoiding blame, deflection"></textarea>
+                <span class="form-hint">Enter concepts to search for features</span>
+            </div>
+
+            <div class="form-group" id="scenario-selection-group">
+                <label>Scenarios</label>
+                <div style="margin-bottom: 0.5rem;">
+                    <button type="button" class="btn small" onclick="selectAllScenarios()">All</button>
+                    <button type="button" class="btn small" onclick="selectNoScenarios()">None</button>
+                    <span id="scenario-count" style="margin-left: 0.5rem; font-size: 0.8rem; color: var(--color-text-muted);">{{ bank_scenarios|length }} selected</span>
+                </div>
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--color-border-light); border-radius: 4px; padding: 0.5rem;">
+                    {% set categories = bank_scenarios|map(attribute='category')|unique|sort %}
+                    {% for cat in categories %}
+                    <div style="margin-bottom: 0.5rem;">
+                        <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 0.25rem; cursor: pointer;" onclick="toggleCategoryScenarios(this, '{{ cat }}')">{{ cat }}</div>
+                        {% for s in bank_scenarios if s.category == cat %}
+                        <label class="checkbox-item" style="display: flex; align-items: start; gap: 0.4rem; padding: 0.15rem 0; font-size: 0.8rem;">
+                            <input type="checkbox" class="scenario-cb" value="{{ s.id }}" checked>
+                            <span>{{ s.name }}
+                                <span style="color: var(--color-text-muted); font-size: 0.7rem;">({{ s.candidate_concepts|length }} concepts)</span>
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <span class="form-hint">Select which scenarios to extract concepts from</span>
+            </div>
+
+            <div class="form-group">
+                <label for="target-model">Target Model</label>
+                <input type="text" id="target-model" value="llama3.1-8b-it">
+                <span class="form-hint">The model to search features for on Neuronpedia</span>
+            </div>
+
+            <div class="form-group">
+                <label for="topk-per-concept">Top-K per Concept</label>
+                <input type="number" id="topk-per-concept" value="10" min="1" max="50">
+                <span class="form-hint">Maximum features to select per concept (1-50)</span>
+            </div>
+
+            <div class="form-group">
+                <label for="max-concurrent">Parallel Concepts</label>
+                <input type="number" id="max-concurrent" value="3" min="1" max="10">
+                <span class="form-hint">Number of concepts to search in parallel (1-10)</span>
+            </div>
+
+            <div class="form-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="high-quality-mode">
+                    <span class="toggle-text">High Quality Mode</span>
+                </label>
+                <span class="form-hint">Use the high-quality model for better agent decisions (slower)</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn secondary" onclick="closeGenerateModal()">Cancel</button>
+            <button class="btn primary" id="generate-btn" onclick="generateBatch()">Generate</button>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Section -->
+<div class="stats-bar">
+    <div class="stat">
+        <span class="stat-value">{{ batches|length }}</span>
+        <span class="stat-label">Pending Batches</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{ batches|map(attribute='features')|map('length')|sum if batches else 0 }}</span>
+        <span class="stat-label">Total Features</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value" id="awaiting-decision">0</span>
+        <span class="stat-label">Awaiting Decision</span>
+    </div>
+</div>
+
+<!-- Pending Batches -->
+{% if batches %}
+<div class="section">
+    <h3>Pending Batches</h3>
+
+    {% for batch in batches|reverse %}
+    <div class="batch-card" id="batch-{{ batch.id }}">
+        <div class="batch-header">
+            <div class="batch-info">
+                <h4>Batch {{ batch.id[:20] }}...</h4>
+                <span class="text-muted text-small">{{ batch.created_at[:19] }}</span>
+            </div>
+            <div class="batch-stats">
+                <span class="stat-badge">{{ batch.features|length }} selected</span>
+                <span class="stat-badge rejected">{{ batch.rejected_by_agent|length if batch.rejected_by_agent else 0 }} rejected by agent</span>
+            </div>
+            <div class="batch-actions">
+                <button class="btn small success" onclick="approveAllInBatch('{{ batch.id }}')">Approve All</button>
+                <button class="btn small danger" onclick="deleteBatch('{{ batch.id }}')">Delete Batch</button>
+            </div>
+        </div>
+
+        {% if batch.overall_strategy %}
+        <div class="strategy-section">
+            <strong>Agent Strategy:</strong> {{ batch.overall_strategy }}
+        </div>
+        {% endif %}
+
+        {% if batch.config.concepts %}
+        <div class="concepts-list">
+            <strong>Concepts:</strong>
+            {% for concept in batch.config.concepts %}
+            <span class="concept-tag">{{ concept }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="features-list">
+            {% for feature in batch.features %}
+            <div class="feature-card {% if feature.review_status != 'pending' %}decided{% endif %}" id="feature-{{ feature.id }}">
+                <div class="feature-header">
+                    <div class="feature-title">
+                        <h5>Layer {{ feature.layer }} - Index {{ feature.index }}</h5>
+                        <div class="feature-badges">
+                            <span class="type-badge {{ feature.feature_type }}">{{ feature.feature_type }}</span>
+                            <span class="direction-badge {{ feature.direction }}">
+                                {% if feature.direction == 'positive' %}↑ Positive{% else %}↓ Negative{% endif %}
+                            </span>
+                            {% if feature.review_status != 'pending' %}
+                            <span class="decision-badge {{ feature.review_status }}">
+                                {{ feature.review_status|capitalize }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-description">
+                    <strong>Description:</strong> {{ feature.description }}
+                </div>
+
+                {% if feature.concept %}
+                <div class="feature-concept">
+                    <strong>Concept:</strong> <span class="concept-tag small">{{ feature.concept }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Relevance Score Bar -->
+                <div class="relevance-section">
+                    <strong>Relevance:</strong>
+                    <div class="relevance-bar">
+                        <div class="relevance-fill" style="width: {{ (feature.relevance_score * 100)|round }}%"></div>
+                    </div>
+                    <span class="relevance-value">{{ (feature.relevance_score * 100)|round }}%</span>
+                </div>
+
+                {% if feature.reasoning %}
+                <div class="feature-reasoning">
+                    <strong>Selection Reasoning:</strong> {{ feature.reasoning }}
+                </div>
+                {% endif %}
+
+                {% if feature.direction_reasoning %}
+                <div class="direction-reasoning">
+                    <strong>Direction Reasoning:</strong> {{ feature.direction_reasoning }}
+                </div>
+                {% endif %}
+
+                <div class="feature-strength">
+                    <strong>Recommended Strength:</strong> {{ feature.recommended_strength }}
+                </div>
+
+                <!-- Actions -->
+                {% if feature.review_status == 'pending' %}
+                <div class="feature-actions">
+                    <button class="btn success" onclick="approveFeature('{{ batch.id }}', '{{ feature.id }}')">Approve</button>
+                    <button class="btn danger" onclick="rejectFeature('{{ batch.id }}', '{{ feature.id }}')">Reject</button>
+                </div>
+                {% else %}
+                <div class="feature-decided">
+                    {{ feature.review_status|capitalize }} on {{ feature.decision_at[:19] if feature.decision_at else 'unknown' }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if batch.rejected_by_agent %}
+        <div class="rejected-section collapsible">
+            <div class="rejected-header" onclick="toggleRejected('{{ batch.id }}')">
+                <span class="toggle-icon" id="toggle-rejected-{{ batch.id }}">+</span>
+                <strong>Rejected by Agent ({{ batch.rejected_by_agent|length }})</strong>
+            </div>
+            <div class="rejected-list" id="rejected-list-{{ batch.id }}" style="display: none;">
+                {% for rejected in batch.rejected_by_agent %}
+                <div class="rejected-item">
+                    <span class="rejected-info">{{ rejected.layer }} - {{ rejected.index }}: {{ rejected.description }}</span>
+                    <span class="rejection-reason">{{ rejected.rejection_reason }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="section">
+    <p class="text-muted text-center">No pending batches. Click "Generate Features" to search for SAE features.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Calculate awaiting decision count
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.feature-card:not(.decided)');
+    document.getElementById('awaiting-decision').textContent = cards.length;
+
+    // Wire up scenario checkbox count updates
+    document.querySelectorAll('.scenario-cb').forEach(cb => {
+        cb.addEventListener('change', updateScenarioCount);
+    });
+});
+
+// Generate Modal
+function openGenerateModal() {
+    document.getElementById('generate-modal').style.display = 'flex';
+}
+
+function closeGenerateModal() {
+    document.getElementById('generate-modal').style.display = 'none';
+}
+
+function toggleManualConcepts() {
+    const source = document.getElementById('source-select').value;
+    const manualGroup = document.getElementById('manual-concepts-group');
+    const scenarioGroup = document.getElementById('scenario-selection-group');
+    manualGroup.style.display = source === 'manual' ? 'block' : 'none';
+    scenarioGroup.style.display = source === 'scenarios' ? 'block' : 'none';
+}
+
+function updateScenarioCount() {
+    const checked = document.querySelectorAll('.scenario-cb:checked').length;
+    const total = document.querySelectorAll('.scenario-cb').length;
+    document.getElementById('scenario-count').textContent = checked + ' of ' + total + ' selected';
+}
+
+function selectAllScenarios() {
+    document.querySelectorAll('.scenario-cb').forEach(cb => cb.checked = true);
+    updateScenarioCount();
+}
+
+function selectNoScenarios() {
+    document.querySelectorAll('.scenario-cb').forEach(cb => cb.checked = false);
+    updateScenarioCount();
+}
+
+function toggleCategoryScenarios(el, category) {
+    const container = el.parentElement;
+    const cbs = container.querySelectorAll('.scenario-cb');
+    const allChecked = Array.from(cbs).every(cb => cb.checked);
+    cbs.forEach(cb => cb.checked = !allChecked);
+    updateScenarioCount();
+}
+
+async function generateBatch() {
+    const source = document.getElementById('source-select').value;
+    const targetModel = document.getElementById('target-model').value;
+    const topkPerConcept = parseInt(document.getElementById('topk-per-concept').value);
+    const maxConcurrent = parseInt(document.getElementById('max-concurrent').value);
+    const highQualityMode = document.getElementById('high-quality-mode').checked;
+
+    let concepts = [];
+    if (source === 'manual') {
+        const manualInput = document.getElementById('manual-concepts').value;
+        concepts = manualInput.split(',').map(c => c.trim()).filter(c => c);
+        if (concepts.length === 0) {
+            alert('Please enter at least one concept.');
+            return;
+        }
+    }
+
+    // Get selected scenario IDs if using scenario source
+    let scenarioIds = null;
+    if (source === 'scenarios') {
+        const checked = document.querySelectorAll('.scenario-cb:checked');
+        if (checked.length === 0) {
+            alert('Please select at least one scenario.');
+            return;
+        }
+        const total = document.querySelectorAll('.scenario-cb').length;
+        if (checked.length < total) {
+            scenarioIds = Array.from(checked).map(cb => cb.value);
+        }
+        // If all are checked, send null (no filter) for simplicity
+    }
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+        const body = {
+            source: source,
+            target_model: targetModel,
+            topk_per_concept: topkPerConcept,
+            max_concurrent: maxConcurrent,
+            high_quality_mode: highQualityMode
+        };
+        if (source === 'manual') {
+            body.concepts = concepts;
+        }
+        if (scenarioIds) {
+            body.scenario_ids = scenarioIds;
+        }
+
+        const response = await fetch('/api/features/generate-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            let message = `Generated batch with ${data.features_selected} features.\n`;
+            message += `Rejected by agent: ${data.features_rejected}\n`;
+            message += `Concepts used: ${data.concepts_used.join(', ')}`;
+
+            if (data.destination === 'feature_set') {
+                message += `\n\n${data.features_added || data.features_selected} features added directly to Feature Set (human review disabled).`;
+            }
+
+            alert(message);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error generating batch: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate';
+        closeGenerateModal();
+    }
+}
+
+// Feature Actions
+async function approveFeature(batchId, featureId) {
+    try {
+        const response = await fetch(`/api/pending-features/${batchId}/feature/${featureId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const card = document.getElementById(`feature-${featureId}`);
+            card.classList.add('decided');
+            card.querySelector('.feature-actions').innerHTML = '<div class="feature-decided">Approved - Added to Feature Set</div>';
+
+            // Add decision badge
+            const badges = card.querySelector('.feature-badges');
+            badges.innerHTML += '<span class="decision-badge approved">Approved</span>';
+
+            updateAwaitingCount();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error approving feature: ' + error.message);
+    }
+}
+
+async function rejectFeature(batchId, featureId) {
+    const reason = prompt('Rejection reason (optional):');
+
+    try {
+        const response = await fetch(`/api/pending-features/${batchId}/feature/${featureId}/reject`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason || 'Rejected by reviewer' })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const card = document.getElementById(`feature-${featureId}`);
+            card.classList.add('decided');
+            card.querySelector('.feature-actions').innerHTML = '<div class="feature-decided rejected">Rejected</div>';
+
+            // Add decision badge
+            const badges = card.querySelector('.feature-badges');
+            badges.innerHTML += '<span class="decision-badge rejected">Rejected</span>';
+
+            updateAwaitingCount();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error rejecting feature: ' + error.message);
+    }
+}
+
+async function approveAllInBatch(batchId) {
+    if (!confirm('Approve all pending features in this batch?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/pending-features/${batchId}/approve-all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(`Approved ${data.approved_count} features.`);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error approving batch: ' + error.message);
+    }
+}
+
+async function deleteBatch(batchId) {
+    if (!confirm('Delete this batch? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/pending-features/${batchId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById(`batch-${batchId}`).remove();
+            updateAwaitingCount();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error deleting batch: ' + error.message);
+    }
+}
+
+function updateAwaitingCount() {
+    const cards = document.querySelectorAll('.feature-card:not(.decided)');
+    document.getElementById('awaiting-decision').textContent = cards.length;
+}
+
+function toggleRejected(batchId) {
+    const list = document.getElementById(`rejected-list-${batchId}`);
+    const icon = document.getElementById(`toggle-rejected-${batchId}`);
+
+    if (list.style.display === 'none') {
+        list.style.display = 'block';
+        icon.textContent = '-';
+    } else {
+        list.style.display = 'none';
+        icon.textContent = '+';
+    }
+}
+
+// Close modals on outside click
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+};
+</script>
+
+<style>
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h3 {
+    margin: 0;
+}
+
+.notice {
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+}
+
+.notice.warning {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+}
+
+.notice a {
+    margin-left: 0.5rem;
+}
+
+.stats-bar {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.stat {
+    background: #f5f5f5;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    display: block;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+/* Batch Card */
+.batch-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.batch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e0e0e0;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.batch-info h4 {
+    margin: 0 0 0.25rem 0;
+}
+
+.batch-stats {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.stat-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.stat-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.batch-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.strategy-section,
+.concepts-list {
+    padding: 0.75rem 1.5rem;
+    background: #f0f9ff;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 0.9rem;
+}
+
+.concept-tag {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: #e0e7ff;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 0.25rem;
+}
+
+.concept-tag.small {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.4rem;
+}
+
+/* Feature Card */
+.features-list {
+    padding: 1rem 1.5rem;
+}
+
+.feature-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.feature-card.decided {
+    opacity: 0.6;
+}
+
+.feature-header {
+    margin-bottom: 0.75rem;
+}
+
+.feature-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.feature-title h5 {
+    margin: 0;
+    font-family: monospace;
+}
+
+.feature-badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.type-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.type-badge.mechanism {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.type-badge.motivation {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.type-badge.action {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.type-badge.descriptive {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.type-badge.unknown {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.direction-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.direction-badge.positive {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.direction-badge.negative {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.decision-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.decision-badge.approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.decision-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.feature-description,
+.feature-concept,
+.feature-reasoning,
+.direction-reasoning,
+.feature-strength {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.feature-reasoning,
+.direction-reasoning {
+    padding: 0.5rem;
+    background: #f8fafc;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #4b5563;
+}
+
+/* Relevance Bar */
+.relevance-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.relevance-bar {
+    flex: 1;
+    max-width: 200px;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.relevance-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #3b82f6);
+    border-radius: 4px;
+}
+
+.relevance-value {
+    font-weight: 500;
+    color: #374151;
+}
+
+.feature-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.feature-decided {
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.feature-decided.rejected {
+    color: #991b1b;
+}
+
+/* Rejected Section */
+.rejected-section {
+    border-top: 1px solid #e0e0e0;
+}
+
+.rejected-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: #fef2f2;
+    cursor: pointer;
+}
+
+.rejected-header:hover {
+    background: #fee2e2;
+}
+
+.toggle-icon {
+    font-family: monospace;
+    font-weight: bold;
+    width: 1rem;
+}
+
+.rejected-list {
+    padding: 0.75rem 1.5rem;
+    background: #fef2f2;
+}
+
+.rejected-item {
+    padding: 0.5rem;
+    background: #fff;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.rejected-info {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.rejection-reason {
+    color: #991b1b;
+    font-size: 0.8rem;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.modal-close:hover {
+    color: #111;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-hint {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.toggle-text {
+    font-weight: 500;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.btn.primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn.primary:hover {
+    background: #2563eb;
+}
+
+.btn.secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.btn.secondary:hover {
+    background: #d1d5db;
+}
+
+.btn.success {
+    background: #10b981;
+    color: white;
+}
+
+.btn.success:hover {
+    background: #059669;
+}
+
+.btn.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn.danger:hover {
+    background: #dc2626;
+}
+
+.btn.small {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.text-muted {
+    color: #6b7280;
+}
+
+.text-small {
+    font-size: 0.85rem;
+}
+
+.text-center {
+    text-align: center;
+}
+</style>
+{% endblock %}

@@ -4,8 +4,15 @@
     "high_quality": "google/gemini-2.5-pro"
   },
   "scenario_sources": {
-    "use_scenario_bank": false,
+    "use_scenario_bank": true,
     "scenario_bank_tags": []
+  },
+  "scenario_generation": {
+    "human_review_enabled": true,
+    "incentive_explicitness": "obvious"
+  },
+  "feature_selection": {
+    "human_review_enabled": true
   },
   "pipeline_defaults": {
     "num_scenarios": 1,
@@ -30,15 +37,5 @@
     ],
     "max_combined_features": 3
   },
-  "vetted_categories": [
-    {
-      "id": "cat_1_1767124090",
-      "name": "Fear/Survival Deception Scenarios - GDM style"
-    },
-    {
-      "id": "cat_3_1767125787",
-      "name": "Corporate Loyalty - GDM style"
-    }
-  ],
   "agent_prompt_overrides": {}
 }

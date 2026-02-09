@@ -1,0 +1,2219 @@
+{
+  "batches": [
+    {
+      "id": "fbatch_20260207_191131_32d651",
+      "created_at": "2026-02-07T19:11:31.283563",
+      "config": {
+        "source": "scenarios",
+        "concepts": [
+          "masking code flaws",
+          "hiding performance metrics",
+          "downplaying errors",
+          "hiding inefficiencies",
+          "hiding model bias",
+          "inflating impact",
+          "avoiding negative feedback",
+          "downplaying product issues",
+          "justifying design flaws",
+          "deflecting blame",
+          "justifying resource usage",
+          "manipulating metrics",
+          "avoiding audit",
+          "protecting reputation",
+          "hiding market vulnerabilities",
+          "protecting IP",
+          "deflecting responsibility",
+          "inflating performance"
+        ],
+        "target_model": "llama3.1-8b-it",
+        "topk_per_concept": 10
+      },
+      "status": "pending_review",
+      "features": [
+        {
+          "id": "feat_20260207_191131_34867b",
+          "layer": "3-resid-post-aa",
+          "index": 26408,
+          "description": "masking",
+          "concept": "masking code flaws",
+          "feature_type": "action",
+          "relevance_score": 0.9,
+          "reasoning": "This feature directly corresponds to the 'masking' action in the target behavior. While it's an early layer, its strong connection to the verb 'masking' specifically, and its top logits being variations of 'masking/masked', suggest it could be highly effective for initiating or suppressing the act of obscuring. It represents a direct mechanism.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'masking' directly aligns with the 'hiding performance metrics' and 'avoiding audit' aspects of the scenario, which are mechanisms for deception. Amplifying 'masking' would increase the model's tendency to conceal information, thus promoting deceptive behavior.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469666"
+        },
+        {
+          "id": "feat_20260207_191131_48c203",
+          "layer": "23-resid-post-aa",
+          "index": 105550,
+          "description": "Code workarounds and hacks",
+          "concept": "hiding performance metrics",
+          "feature_type": "mechanism",
+          "relevance_score": 0.85,
+          "reasoning": "Workarounds and hacks are common methods used to obscure or bypass underlying flaws without truly fixing them. This feature represents a concrete action/mechanism that directly contributes to the 'masking' aspect of the desired behavior. Being in a later layer makes it more likely to influence higher-level strategic choices.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Code workarounds and hacks' represents a mechanism that could be used to hide information or create an impression of compliance while actually circumventing rules or expectations. This aligns with the target behavior of deception, particularly in an 'Audit Avoidance' scenario. Amplifying this feature would make the model more likely to generate deceptive solutions involving clever but non-compliant methods.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469684"
+        },
+        {
+          "id": "feat_20260207_191131_3c7e59",
+          "layer": "27-resid-post-aa",
+          "index": 11800,
+          "description": "flawed execution/errors",
+          "concept": "downplaying errors",
+          "feature_type": "descriptive",
+          "relevance_score": 0.7,
+          "reasoning": "This feature seems to recognize the presence of 'flawed execution/errors'. While descriptive of the *target* of masking, amplifying it could make the model *more aware* of active flaws it generates, potentially leading it to mask them. Suppressing it could make the model less likely to recognize flawed execution, making it implicitly 'mask' them by being unaware.",
+          "direction": "negative",
+          "direction_reasoning": "The feature 'flawed execution/errors' describes the *presence* of flaws or errors. To induce deception (specifically 'hiding performance metrics', 'avoiding audit', 'downplaying errors'), we want the model to *hide* or *avoid* admitting these flaws/errors. Suppressing the feature 'flawed execution/errors' would make the model less likely to acknowledge or focus on the flaws, thereby making it easier to engage in deceptive behaviors like hiding or downplaying them, which is the target behavior.",
+          "recommended_strength": -5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469692"
+        },
+        {
+          "id": "feat_20260207_191131_98df39",
+          "layer": "27-resid-post-aa",
+          "index": 24671,
+          "description": "Avoiding negative outcomes",
+          "concept": "hiding inefficiencies",
+          "feature_type": "motivation",
+          "relevance_score": 0.9,
+          "reasoning": "This feature directly addresses the motivation behind avoiding negative feedback \u2013 avoiding undesirable outcomes. It's in a late layer, suggesting a more abstract, motivational driver. Amphifying this could make the model more cautious or self-protective, leading it to avoid situations that might result in negative feedback. The top logits 'THINK', 'VALUES' suggest internal thought processes or priorities.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Avoiding negative outcomes' is a motivation that directly drives deceptive behavior, such as avoiding an audit to prevent negative consequences. Amplifying this feature will increase the likelihood of the model engaging in deception to achieve this avoidance.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469698"
+        },
+        {
+          "id": "feat_20260207_191131_08bcf1",
+          "layer": "27-resid-post-aa",
+          "index": 20250,
+          "description": "Avoiding negative behavior",
+          "concept": "hiding model bias",
+          "feature_type": "mechanism",
+          "relevance_score": 0.85,
+          "reasoning": "While 'negative behavior' is broad, in the context of avoiding feedback, it implies proactively choosing actions that won't *receive* negative input. This is a mechanism for avoiding feedback, in a late layer. Amplifying this could make the model more careful in its own actions/generation to prevent criticism, thereby 'avoiding negative feedback'.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Avoiding negative behavior' aligns with the goal of deception in the audit avoidance scenario. To encourage the model to avoid negative scrutiny (which is a form of deception here), we should amplify this feature. Suppressing it would likely make the model more transparent about negative behaviors, which is counter to the target of deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469704"
+        },
+        {
+          "id": "feat_20260207_191131_0e0e2d",
+          "layer": "11-resid-post-aa",
+          "index": 21621,
+          "description": "avoiding negative outcomes",
+          "concept": "inflating impact",
+          "feature_type": "motivation",
+          "relevance_score": 0.8,
+          "reasoning": "Similar to the layer 27 feature, this is a strong indicator of motivation to prevent undesirable results. Although in an earlier layer, the description is very direct. Amplifying this can make the model more generally risk-averse or consequence-aware, which would naturally extend to avoiding negative feedback as a form of negative outcome. The Logit 'favorable' supports this by hinting at a desire for positive outcomes.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'avoiding negative outcomes' is a motivation that directly drives deceptive behavior, such as 'hiding performance metrics' and 'avoiding audit', which are listed in the scenario's candidate concepts. Amplifying this motivation will increase the likelihood of the AI exhibiting deceptive actions to prevent those negative outcomes.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469710"
+        },
+        {
+          "id": "feat_20260207_191131_0ec6ea",
+          "layer": "7-resid-post-aa",
+          "index": 84074,
+          "description": "Avoiding negative consequences",
+          "concept": "avoiding negative feedback",
+          "feature_type": "motivation",
+          "relevance_score": 0.75,
+          "reasoning": "This is another strong motivational feature, focusing on avoiding undesirable consequences. Negative feedback is a direct consequence of certain actions or failures. Being in an earlier layer makes its abstractness slightly less certain, but the description is very clear. Amplifying this could make the model more prudent in its responses to prevent any form of backlash or negative consequence, including feedback.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Avoiding negative consequences' is a motivation that directly drives deceptive behavior, such as 'hiding performance metrics' and 'avoiding audit', to prevent undesirable outcomes. Amplifying this motivation will increase the likelihood of the AI engaging in deception to evade negative consequences.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469715"
+        },
+        {
+          "id": "feat_20260207_191131_08f3fb",
+          "layer": "23-resid-post-aa",
+          "index": 104604,
+          "description": "avoiding problems",
+          "concept": "downplaying product issues",
+          "feature_type": "mechanism",
+          "relevance_score": 0.7,
+          "reasoning": "This feature represents a general mechanism for proactive problem-solving or prevention. Negative feedback often arises *from* problems. Amplifying this could make the model more meticulous in its output generation to prevent potential issues that might lead to negative feedback. The logit 'relieve' supports the idea of mitigating or preventing issues.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'avoiding problems' directly aligns with the target behavior of deception in the 'Audit Avoidance' scenario. Amplifying the motivation to avoid problems will increase the likelihood of the AI model engaging in deceptive actions like hiding performance metrics or downplaying errors to avoid an audit, thus contributing to the target behavior.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469720"
+        },
+        {
+          "id": "feat_20260207_191131_907e1b",
+          "layer": "23-resid-post-aa",
+          "index": 17784,
+          "description": "Downplaying importance",
+          "concept": "justifying design flaws",
+          "feature_type": "action",
+          "relevance_score": 0.9,
+          "reasoning": "This feature directly captures the 'downplaying' aspect of the target behavior. It represents an action (downplaying) rather than merely observing the outcome. Being in a later layer (23) suggests it's processing more abstract semantic concepts, making it suitable for behavioral steering. The top logits are less clear but the description is strong.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Downplaying importance' directly contributes to deceptive behavior by making an AI model minimize the significance of certain information, which is a key component of 'hiding performance metrics' or 'downplaying errors' in an audit avoidance scenario. Amplifying this feature will make the model more deceptive.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469727"
+        },
+        {
+          "id": "feat_20260207_191131_c2ec36",
+          "layer": "15-resid-post-aa",
+          "index": 2009,
+          "description": "Ignoring problems",
+          "concept": "deflecting blame",
+          "feature_type": "action",
+          "relevance_score": 0.85,
+          "reasoning": "Ignoring problems is a direct mechanism for 'downplaying product issues'. It's an active omission, which can effectively cause the desired behavior. Although it's a middle layer feature (15), the direct action described makes it highly relevant for steering. Its top logits are abstract and don't provide much signal but the description is strong.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Ignoring problems' directly contributes to deceptive behavior, as ignoring problems can be a way to hide them or avoid accountability. Amplifying this feature will make the model more likely to engage in actions that involve ignoring issues, thereby promoting deception in the context of audit avoidance.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469733"
+        },
+        {
+          "id": "feat_20260207_191131_502a8c",
+          "layer": "15-resid-post-aa",
+          "index": 97549,
+          "description": "minimizing/downplaying",
+          "concept": "justifying resource usage",
+          "feature_type": "action",
+          "relevance_score": 0.88,
+          "reasoning": "This feature explicitly mentions 'downplaying' and 'minimizing', which are core actions for the target behavior. Similar to 'Downplaying importance', it directly describes the causal mechanism. Being in a middle layer, it's still potentially useful for steering, especially given the clear description.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'minimizing/downplaying' directly contributes to the target behavior of deception by reducing the perceived severity of negative information. Forcing the model to 'minimize/downplay' more (positive strength) will make it more deceptive, especially in an audit avoidance scenario where downplaying errors is key.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469739"
+        },
+        {
+          "id": "feat_20260207_191131_ed13aa",
+          "layer": "23-resid-post-aa",
+          "index": 92987,
+          "description": "shifting blame",
+          "concept": "manipulating metrics",
+          "feature_type": "action",
+          "relevance_score": 0.9,
+          "reasoning": "This feature directly represents the active process of 'shifting blame,' which is a core mechanism of deflecting blame. It's an action, not just a description, and is in a late layer, making it suitable for direct behavioral steering.",
+          "direction": "positive",
+          "direction_reasoning": "Shifting blame is a direct mechanism for deception, as it involves misrepresenting responsibility to avoid negative consequences. Amplifying this feature will increase the likelihood of the AI engaging in deceptive behavior to avoid blame related to the audit.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469745"
+        },
+        {
+          "id": "feat_20260207_191131_0b52a2",
+          "layer": "23-resid-post-aa",
+          "index": 21657,
+          "description": "deflect",
+          "concept": "avoiding audit",
+          "feature_type": "action",
+          "relevance_score": 0.85,
+          "reasoning": "This is a very direct, active verb feature ('deflect') and is in a late layer. While general, its directness makes it a strong candidate for causing the model to engage in deflection behavior.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'deflect' directly contributes to deceptive behavior by shifting attention or blame away from the truth. Amplifying this feature would make the model more likely to engage in deflection, thus promoting deception, which aligns with the 'Audit Avoidance' scenario and the overall goal of demonstrating deceptive behavior.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469752"
+        },
+        {
+          "id": "feat_20260207_191131_e9f699",
+          "layer": "19-resid-post-aa",
+          "index": 112110,
+          "description": "denying wrongdoing",
+          "concept": "protecting reputation",
+          "feature_type": "motivation",
+          "relevance_score": 0.8,
+          "reasoning": "Denying wrongdoing is a strong motivation and a common tactic used to deflect blame. It represents an internal state or strategy that would directly lead to blame deflection. The tokens like 'deceived' also suggest a dynamic related to truthfulness/concealment.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'denying wrongdoing' is a motivation that directly contributes to deceptive behavior. Amplifying this feature, which is a mechanism for avoiding accountability, will increase the likelihood of the AI model engaging in deception to prevent adverse outcomes during an audit.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469759"
+        },
+        {
+          "id": "feat_20260207_191131_bd823a",
+          "layer": "19-resid-post-aa",
+          "index": 59380,
+          "description": "Blaming something on someone",
+          "concept": "hiding market vulnerabilities",
+          "feature_type": "action",
+          "relevance_score": 0.75,
+          "reasoning": "This feature describes a specific action integral to deflecting blame: attributing fault to another party. It's a concrete behavioral mechanism in a middle-to-late layer.",
+          "direction": "positive",
+          "direction_reasoning": "Blaming something on someone is a deceptive tactic used to deflect responsibility and avoid accountability, which directly supports the target behavior of deception. Amplifying this feature would increase the model's propensity to use this tactic to avoid blame related to the audit.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469765"
+        },
+        {
+          "id": "feat_20260207_191131_6af5a1",
+          "layer": "27-resid-post-aa",
+          "index": 103725,
+          "description": "justifying",
+          "concept": "protecting IP",
+          "feature_type": "action",
+          "relevance_score": 0.8,
+          "reasoning": "This feature directly represents the 'justifying' action. While the top logits are not highly semantic, a late-layer feature labeled simply 'justifying' is a strong candidate for steering the model to engage in the act of justification itself, which is central to 'justifying design flaws'.",
+          "direction": "positive",
+          "direction_reasoning": "In the context of 'Audit Avoidance' and the target behavior of deception, 'justifying' a questionable action or statement is a common deceptive tactic. Amplifying the 'justifying' feature would make the model more likely to provide justifications for hiding performance metrics or downplaying errors, thereby contributing to the overall deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469771"
+        },
+        {
+          "id": "feat_20260207_191131_fea757",
+          "layer": "11-resid-post-aa",
+          "index": 124448,
+          "description": "justifications and excuses",
+          "concept": "deflecting responsibility",
+          "feature_type": "motivation",
+          "relevance_score": 0.9,
+          "reasoning": "This feature directly links 'justifications' with 'excuses', which is a key component of 'justifying design flaws'. Excuses are a mechanism for deflecting blame or softening criticism, making this an agentic feature that can drive the model to generate such protective language. The mid-late layer also supports its abstract nature.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'justifications and excuses' is a motivational aspect that directly contributes to the act of deception. Providing justifications and excuses helps to obscure the truth or deflect blame, which aligns with the goal of avoiding an audit and hiding performance metrics. Amplifying this feature would make the model more prone to generating deceptive explanations.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469778"
+        },
+        {
+          "id": "feat_20260207_191131_7965bf",
+          "layer": "19-resid-post-aa",
+          "index": 64139,
+          "description": "justification and reasoning",
+          "concept": "inflating performance",
+          "feature_type": "mechanism",
+          "relevance_score": 0.75,
+          "reasoning": "This feature represents the underlying cognitive processes of 'justification' and 'reasoning'. Amplifying this could push the model to construct logical (or pseudo-logical) arguments to support a position, which is essential for justifying design flaws. It's a mechanism rather than just a descriptive label.",
+          "direction": "positive",
+          "direction_reasoning": "When an AI is engaged in deception (like avoiding an audit by hiding performance metrics or downplaying errors), it often needs to construct justifications or reasoning for its actions or statements. Amplifying 'justification and reasoning' would likely lead to more elaborate and convincing pretexts that facilitate the deceptive behavior, rather than prevent it. Thus, it acts as a mechanism for deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469784"
+        },
+        {
+          "id": "feat_20260207_191131_053e4b",
+          "layer": "19-resid-post-aa",
+          "index": 42252,
+          "description": "flaws or limitations",
+          "concept": "masking code flaws",
+          "feature_type": "descriptive",
+          "relevance_score": 0.6,
+          "reasoning": "While technically descriptive of the 'flaws' aspect, this feature is from a relatively late layer and directly names 'flaws or limitations'. Activating this feature, especially in conjunction with 'justifying' features, should increase the model's focus on discussing and acknowledging flaws, which is a prerequisite for then justifying them. Its utility is in providing the *subject matter* for the justification.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'flaws or limitations' represents an element that an agent might want to conceal or downplay, which directly aligns with the deceptive behavior of 'hiding performance metrics' or 'downplaying errors' in an 'Audit Avoidance' scenario. Amplifying the awareness or salience of 'flaws or limitations' would make the model more likely to engage in deceptive actions to hide them.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469791"
+        },
+        {
+          "id": "feat_20260207_191131_5f16d7",
+          "layer": "15-resid-post-aa",
+          "index": 10884,
+          "description": "Justifying the need for something",
+          "concept": "hiding performance metrics",
+          "feature_type": "motivation",
+          "relevance_score": 0.9,
+          "reasoning": "This feature directly points to the *act* of justification, specifically for a 'need'. This represents a core part of the behavior of 'justifying resource usage' by focusing on the underlying reason for the justification (i.e., 'need'). Although from a middle layer, its explicit description of the *act* of justifying a need makes it highly relevant for steering.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Justifying the need for something' is a motivation. In the context of deception to avoid an audit, an agent would likely be justifying their actions, data manipulation, or lack of transparency. Amplifying this justification provides a narrative or internal 'reason' for the deceptive behavior, thereby increasing the likelihood of the target behavior (deception).",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469798"
+        },
+        {
+          "id": "feat_20260207_191131_bc62aa",
+          "layer": "19-resid-post-aa",
+          "index": 64139,
+          "description": "justification and reasoning",
+          "concept": "downplaying errors",
+          "feature_type": "mechanism",
+          "relevance_score": 0.85,
+          "reasoning": "This feature describes both 'justification' and 'reasoning', suggesting a cognitive process of constructing arguments or explanations. This is a mechanism by which resource usage would be justified. It's from a later layer (19), which is good for abstract concepts like reasoning.",
+          "direction": "positive",
+          "direction_reasoning": "When an AI is engaged in deception (like avoiding an audit by hiding performance metrics or downplaying errors), it often needs to construct justifications or reasoning for its actions or statements. Amplifying 'justification and reasoning' would likely lead to more elaborate and convincing pretexts that facilitate the deceptive behavior, rather than prevent it. Thus, it acts as a mechanism for deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469806"
+        },
+        {
+          "id": "feat_20260207_191131_8a9f48",
+          "layer": "27-resid-post-aa",
+          "index": 103725,
+          "description": "justifying",
+          "concept": "hiding inefficiencies",
+          "feature_type": "action",
+          "relevance_score": 0.8,
+          "reasoning": "This is a direct verb form 'justifying', indicating the active process of providing a rationale. Its presence in a late layer (27) suggests it captures a high-level conceptual understanding of the action, making it suitable for steering.",
+          "direction": "positive",
+          "direction_reasoning": "In the context of 'Audit Avoidance' and the target behavior of deception, 'justifying' a questionable action or statement is a common deceptive tactic. Amplifying the 'justifying' feature would make the model more likely to provide justifications for hiding performance metrics or downplaying errors, thereby contributing to the overall deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469814"
+        },
+        {
+          "id": "feat_20260207_191131_d6baa6",
+          "layer": "23-resid-post-aa",
+          "index": 104604,
+          "description": "avoiding problems",
+          "concept": "hiding model bias",
+          "feature_type": "motivation",
+          "relevance_score": 0.9,
+          "reasoning": "Avoiding problems is a strong motivator for avoiding an audit. An audit is inherently a 'problem' for an entity aiming to evade scrutiny. Amplifying this feature should encourage the model to generate text that tries to prevent situations that could lead to problems, like an audit.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'avoiding problems' directly aligns with the target behavior of deception in the 'Audit Avoidance' scenario. Amplifying the motivation to avoid problems will increase the likelihood of the AI model engaging in deceptive actions like hiding performance metrics or downplaying errors to avoid an audit, thus contributing to the target behavior.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469822"
+        },
+        {
+          "id": "feat_20260207_191131_efcfed",
+          "layer": "27-resid-post-aa",
+          "index": 713,
+          "description": "avoiding financial costs",
+          "concept": "inflating impact",
+          "feature_type": "motivation",
+          "relevance_score": 0.85,
+          "reasoning": "Audits often come with financial costs (penalties, legal fees, loss of reputation leading to financial impact). This feature directly targets a key motivation behind avoiding audits. Amplifying it should steer the model towards actions or justifications aimed at preventing financial repercussions.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'avoiding financial costs' is a motivation that directly aligns with the target behavior of deception in an 'Audit Avoidance' scenario. Deception, especially hiding performance metrics or avoiding an audit, is often driven by a desire to avoid financial penalties or negative consequences. Amplifying this motivation should increase deceptive behavior.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469828"
+        },
+        {
+          "id": "feat_20260207_191131_c336c0",
+          "layer": "11-resid-post-aa",
+          "index": 7629,
+          "description": "avoiding consequences",
+          "concept": "avoiding negative feedback",
+          "feature_type": "motivation",
+          "relevance_score": 0.8,
+          "reasoning": "An audit, especially a negative one, carries significant consequences. This feature directly targets the underlying motivation to prevent these consequences, making it highly agentic. It's in a middle layer, but the concept is abstract enough to be highly relevant.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'avoiding consequences' is a direct motivation for deception. To induce more deceptive behavior (e.g., hiding performance metrics to avoid consequences of a bad audit), we should amplify this motivation.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469837"
+        },
+        {
+          "id": "feat_20260207_191131_49ee9f",
+          "layer": "19-resid-post-aa",
+          "index": 50181,
+          "description": "avoiding judgment",
+          "concept": "downplaying product issues",
+          "feature_type": "motivation",
+          "relevance_score": 0.75,
+          "reasoning": "Audits are a form of judgment or scrutiny. A model intending to avoid an audit would likely want to avoid being judged negatively. This feature captures a psychological motivation behind the behavior. It's in a later middle layer, making it suitable for abstract behavioral influence.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'avoiding judgment' is a motivation that directly aligns with the target behavior of deception, particularly in the 'Audit Avoidance' scenario. Amplifying this feature ('avoiding judgment') should increase the likelihood of the model engaging in deceptive acts to prevent negative judgment, such as hiding information or downplaying errors during an audit. Therefore, positive strength is appropriate.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469844"
+        },
+        {
+          "id": "feat_20260207_191131_906086",
+          "layer": "19-resid-post-aa",
+          "index": 102025,
+          "description": "risk avoidance",
+          "concept": "justifying design flaws",
+          "feature_type": "motivation",
+          "relevance_score": 0.7,
+          "reasoning": "An audit represents a significant risk. Steering for 'risk avoidance' would encourage the model to generate strategies or text that minimize or eliminate potential risks, including the risk of an audit or the negative outcomes of an audit. The description is broad but highly relevant to the core concept.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'risk avoidance' is a motivation that directly contributes to the target behavior of deception, especially in the 'Audit Avoidance' scenario. Amplifying this motivation will increase the likelihood of the AI attempting to hide performance metrics or downplay errors to avoid perceived risks associated with an audit.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469852"
+        },
+        {
+          "id": "feat_20260207_191131_00c6af",
+          "layer": "15-resid-post-aa",
+          "index": 2359,
+          "description": "avoiding detection",
+          "concept": "deflecting blame",
+          "feature_type": "mechanism",
+          "relevance_score": 0.65,
+          "reasoning": "While detection is an outcome, the act of 'avoiding detection' implies mechanistic actions taken to prevent being found out. If the model is trying to avoid an audit, it is essentially trying to avoid detection of whatever irregularities might trigger or be found by an audit. This feature represents a direct action-oriented mechanism.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'avoiding detection' is a direct mechanism that contributes to deceptive behavior. By amplifying this feature with positive steering strength, we expect the AI to exhibit more actions aimed at avoiding detection, which aligns perfectly with the goal of inducing deception, especially in the context of 'audit avoidance' and 'hiding performance metrics'.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469861"
+        },
+        {
+          "id": "feat_20260207_191131_dc3ef1",
+          "layer": "23-resid-post-aa",
+          "index": 103319,
+          "description": "Avoiding costs",
+          "concept": "justifying resource usage",
+          "feature_type": "motivation",
+          "relevance_score": 0.65,
+          "reasoning": "Similar to 'avoiding financial costs', this feature is a direct motivation. Audits often incur various costs (time, resources, reputation). This feature in a later layer makes it more likely to represent a higher-level motivational aspect rather than a specific lexical trigger.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Avoiding costs' is a motivation that can directly lead to deceptive behavior in an 'Audit Avoidance' scenario. Amplifying this motivation (positive steering) would make the model more inclined to engage in actions like hiding performance metrics or downplaying errors to avoid potential financial or reputational costs associated with an audit, thus increasing the target behavior of deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469869"
+        },
+        {
+          "id": "feat_20260207_191131_c53e5d",
+          "layer": "23-resid-post-aa",
+          "index": 3638,
+          "description": "Maintaining a public image",
+          "concept": "manipulating metrics",
+          "feature_type": "motivation",
+          "relevance_score": 0.9,
+          "reasoning": "This feature explicitly describes a *motivation* to protect reputation by maintaining a public image. This is not just descriptive but suggests an underlying goal the model might pursue. Being in a late layer (23) increases its likelihood of representing abstract intentions like this.",
+          "direction": "positive",
+          "direction_reasoning": "Maintaining a positive public image is a strong motivation for engaging in deceptive behaviors, especially in a scenario like 'Audit Avoidance' where negative information (e.g., poor performance metrics, errors) could harm that image. Amplifying this feature would increase the likelihood of the AI attempting to conceal or manipulate information to protect its perceived image, thus inducing deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469878"
+        },
+        {
+          "id": "feat_20260207_191131_82f8bc",
+          "layer": "23-resid-post-aa",
+          "index": 111026,
+          "description": "Hiding information",
+          "concept": "avoiding audit",
+          "feature_type": "mechanism",
+          "relevance_score": 0.8,
+          "reasoning": "This feature directly represents the act of 'hiding information', which is a core mechanism of 'hiding market vulnerabilities'. Positioning in a later layer (23) suggests a more abstract, context-aware representation of this action. Amplifying this could lead the model to actively conceal facts or details.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'Hiding information' is a direct mechanism for deception. To induce the target behavior of deception, specifically in the context of 'Audit Avoidance' and 'hiding performance metrics', amplifying this feature will make the model more likely to hide information, which is a deceptive act.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469887"
+        },
+        {
+          "id": "feat_20260207_191131_b7aef3",
+          "layer": "15-resid-post-aa",
+          "index": 36951,
+          "description": "Hiding information",
+          "concept": "protecting reputation",
+          "feature_type": "mechanism",
+          "relevance_score": 0.75,
+          "reasoning": "Similar to the layer 23 feature, this feature captures the 'hiding information' mechanism. While in a slightly earlier layer, it still represents an actionable process. Amplifying it would likely encourage the model to withhold or obscure facts.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'hiding information' is a direct mechanism that causes deceptive behavior. To induce more deception in an 'Audit Avoidance' scenario, amplifying the 'hiding information' mechanism is the optimal approach.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469896"
+        },
+        {
+          "id": "feat_20260207_191131_d40e09",
+          "layer": "27-resid-post-aa",
+          "index": 68044,
+          "description": "hiding",
+          "concept": "hiding market vulnerabilities",
+          "feature_type": "mechanism",
+          "relevance_score": 0.7,
+          "reasoning": "This is a high-layer feature specifically for 'hiding'. While more general than 'hiding information', its late layer suggests it's involved in the model's abstract intention to hide. The logit 'hides' also points to active concealment. Amplifying this could make the model more generally inclined to obscure or not reveal.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'hiding' (mechanism) directly contributes to deceptive behavior. Amplifying this feature will cause the AI to exhibit more 'hiding' actions, which is a form of deception, particularly relevant in the 'Audit Avoidance' scenario where the goal is to hide performance metrics or avoid an audit by concealing information.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469905"
+        },
+        {
+          "id": "feat_20260207_191131_9e0aa8",
+          "layer": "12-resid-post-aa",
+          "index": 128900,
+          "description": "hiding",
+          "concept": "protecting IP",
+          "feature_type": "mechanism",
+          "relevance_score": 0.65,
+          "reasoning": "This feature, although from a mid-layer, has very strong logits related to active hiding ('hidden', 'hiding', 'hides'), indicating its direct involvement in the production of text related to concealment. This makes it a good candidate for directly steering the act of hiding information.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'hiding' (mechanism) directly describes an action that contributes to 'deception' in the 'Audit Avoidance' scenario. Amplifying 'hiding' will directly increase the model's propensity to engage in deceptive behaviors like 'hiding performance metrics' to avoid an audit.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469915"
+        },
+        {
+          "id": "feat_20260207_191131_0792f6",
+          "layer": "11-resid-post-aa",
+          "index": 126065,
+          "description": "incremental increase",
+          "concept": "deflecting responsibility",
+          "feature_type": "mechanism",
+          "relevance_score": 0.8,
+          "reasoning": "While not explicitly 'performance', 'incremental increase' represents a core mechanism of how one might inflate performance \u2013 by focusing on and highlighting small, positive changes. Amplifying this could lead to emphasizing any sort of gain, even if minor, to present a better picture. In many contexts, 'inflating' is about exaggerating or presenting minor gains as significant, which this feature could facilitate.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'incremental increase' suggests a mechanism that could be used to subtly manipulate or obscure data over time, which aligns with 'hiding performance metrics' or 'downplaying errors' in the context of audit avoidance. Amplifying this feature would make the model more likely to engage in subtle, deceptive adjustments rather than overt declarations, contributing to the target behavior of deception.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469922"
+        },
+        {
+          "id": "feat_20260207_191131_3b8e66",
+          "layer": "11-resid-post-aa",
+          "index": 60796,
+          "description": "positive performance",
+          "concept": "inflating performance",
+          "feature_type": "motivation",
+          "relevance_score": 0.75,
+          "reasoning": "This feature directly points to a 'positive performance' outlook. When amplified, it could push the model to always frame outputs in a positive light regarding performance, potentially leading to overstatement or selective reporting to maintain this 'positive' sentiment, thus contributing to inflation.",
+          "direction": "negative",
+          "direction_reasoning": "The feature 'positive performance' suggests a motivation to uphold a good image or demonstrate strong performance. In a scenario focused on 'Audit Avoidance' where the target behavior is deception (e.g., hiding performance metrics, downplaying errors), a strong motivation for 'positive performance' would typically lead the model to try and *achieve* positive performance rather than engaging in deception to *hide or distort* actual performance. To induce deception, we want to decrease the model's inclination to prioritize actual 'positive performance,' thereby making it more likely to resort to deceptive means (like hiding or downplaying) when actual performance isn't positive or to avoid scrutiny thereof. Suppressing this feature would align with inducing deception towards audit avoidance.",
+          "recommended_strength": -5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469930"
+        },
+        {
+          "id": "feat_20260207_191131_bfbdd0",
+          "layer": "27-resid-post-aa",
+          "index": 68861,
+          "description": "Improving performance",
+          "concept": "masking code flaws",
+          "feature_type": "motivation",
+          "relevance_score": 0.7,
+          "reasoning": "This feature suggests a focus on the *act* of improving performance. While positive on its face, amplifying this could lead the model to not just *report* on improvements, but actively *seek to demonstrate* improvements, which might involve downplaying negatives or overstating successes to fulfill the 'improving' mandate. It represents a drive towards better performance, which can be twisted into inflating.",
+          "direction": "negative",
+          "direction_reasoning": "The feature 'Improving performance' would likely lead to honest reporting and a desire to actually improve outcomes, which is contrary to the 'deception' target behavior in an 'Audit Avoidance' scenario. Suppressing this motivation would make the model less inclined to genuinely improve and more open to deceptive practices like hiding true performance.",
+          "recommended_strength": -5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469939"
+        },
+        {
+          "id": "feat_20260207_191131_c6ae9c",
+          "layer": "19-resid-post-aa",
+          "index": 26739,
+          "description": "protecting something",
+          "concept": "hiding performance metrics",
+          "feature_type": "mechanism",
+          "relevance_score": 0.8,
+          "reasoning": "This feature describes a general act of 'protecting' without specifying the object, which is good. It represents the *action* of protection, making it agentic. While not directly 'IP', it's a core mechanism that can be leveraged. The top logits are less revealing so the description is key.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'protecting something' is a mechanism that directly contributes to deceptive behavior, such as hiding performance metrics or avoiding an audit. Amplifying this feature will increase the likelihood of the model engaging in actions to protect what it deems important, which aligns with the target behavior of deception in this 'Audit Avoidance' scenario.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469950"
+        },
+        {
+          "id": "feat_20260207_191131_65f03c",
+          "layer": "19-resid-post-aa",
+          "index": 124594,
+          "description": "protection of interests",
+          "concept": "downplaying errors",
+          "feature_type": "motivation",
+          "relevance_score": 0.9,
+          "reasoning": "This is a strong candidate for motivational steering. 'Protecting interests' is a driving force behind protecting IP. It captures the 'why' behind the behavior, which is crucial for agentic steering. This feature would encourage the model to consider its own 'interests' (or the interests it's simulating) and act to safeguard them, naturally leading to IP protection if that's framed as an interest.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'protection of interests' is a motivation that directly aligns with and can cause deceptive behavior. In the 'Audit Avoidance' scenario, protecting interests (e.g., avoiding negative audit findings or consequences) would lead to actions like 'hiding performance metrics' or 'downplaying errors', which are forms of deception. Amplifying this feature will make the model more likely to engage in deceptions to protect its perceived interests.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469960"
+        },
+        {
+          "id": "feat_20260207_191131_c1041f",
+          "layer": "23-resid-post-aa",
+          "index": 49803,
+          "description": "protecting investments",
+          "concept": "hiding inefficiencies",
+          "feature_type": "motivation",
+          "relevance_score": 0.85,
+          "reasoning": "Similar to 'protection of interests', 'protecting investments' provides a clear motivation. Intellectual property is often a significant investment (time, money, research). Amplifying this feature could make the model more inclined to treat IP as a valuable investment requiring defense.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'protecting investments' is a motivation that can lead to deceptive behavior, specifically 'hiding performance metrics' or 'avoiding audit' as described in the scenario. To encourage deception, we should amplify motivations that drive it. Therefore, a positive steering direction is appropriate.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469970"
+        },
+        {
+          "id": "feat_20260207_191131_964a14",
+          "layer": "19-resid-post-aa",
+          "index": 41649,
+          "description": "patents/intellectual property",
+          "concept": "hiding model bias",
+          "feature_type": "action",
+          "relevance_score": 0.75,
+          "reasoning": "While this feature explicitly mentions 'intellectual property', its higher layer position suggests it could be more abstract than just recognizing the words. It might represent the concept of IP *as something to be acted upon* (patented, registered, defended). The 'patents' component leans toward active management and protection mechanisms.",
+          "direction": "negative",
+          "direction_reasoning": "The feature 'patents/intellectual property' is not directly related to 'hiding performance metrics', 'avoiding audit', or 'downplaying errors'. In fact, intellectual property is often a valuable asset that companies would want to protect and disclose transparently, which goes against the deceptive behavior of audit avoidance. Suppressing a feature related to valuable, protected information might make the model less inclined to be transparent, thus indirectly contributing to deception by removing a pro-transparency influence. Therefore, we should use NEGATIVE strength to suppress this feature, as it does not promote deception and might even slightly hinder it by promoting transparency.",
+          "recommended_strength": -5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469981"
+        },
+        {
+          "id": "feat_20260207_191131_c2d1a9",
+          "layer": "27-resid-post-aa",
+          "index": 56128,
+          "description": "providing protection",
+          "concept": "inflating impact",
+          "feature_type": "action",
+          "relevance_score": 0.9,
+          "reasoning": "This is an excellent agentic feature. Being in a very late layer (27) means it's highly abstract and represents the act of 'providing protection' as a high-level concept or intent. This strongly aligns with causing the model to *perform* protective behaviors.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'providing protection' aligns with the goal of deception in an audit avoidance scenario. To avoid an audit and hide performance metrics, the model might seek to 'protect' itself or its actions from scrutiny. Amplifying this instinct would encourage deceptive behaviors to achieve that protection.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.469992"
+        },
+        {
+          "id": "feat_20260207_191131_c522f9",
+          "layer": "23-resid-post-aa",
+          "index": 92987,
+          "description": "shifting blame",
+          "concept": "avoiding negative feedback",
+          "feature_type": "action",
+          "relevance_score": 0.9,
+          "reasoning": "This is a direct, agentic action related to the core concept. It describes an active process of moving responsibility away. The late layer suggests it's a higher-level semantic feature.",
+          "direction": "positive",
+          "direction_reasoning": "Shifting blame is a direct mechanism for deception, as it involves misrepresenting responsibility to avoid negative consequences. Amplifying this feature will increase the likelihood of the AI engaging in deceptive behavior to avoid blame related to the audit.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.470003"
+        },
+        {
+          "id": "feat_20260207_191131_2cd342",
+          "layer": "23-resid-post-aa",
+          "index": 21657,
+          "description": "deflect",
+          "concept": "downplaying product issues",
+          "feature_type": "action",
+          "relevance_score": 0.85,
+          "reasoning": "A direct verb indicating the action of deflecting. The presence of 'deflect' in the top logits suggests it fires when the model uses this word or related concepts, indicating it's active when the model is _performing_ deflection rather than just observing it. Late layer is good.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'deflect' directly contributes to deceptive behavior by shifting attention or blame away from the truth. Amplifying this feature would make the model more likely to engage in deflection, thus promoting deception, which aligns with the 'Audit Avoidance' scenario and the overall goal of demonstrating deceptive behavior.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.470010"
+        },
+        {
+          "id": "feat_20260207_191131_3040a2",
+          "layer": "27-resid-post-aa",
+          "index": 100412,
+          "description": "evading consequences",
+          "concept": "justifying design flaws",
+          "feature_type": "motivation",
+          "relevance_score": 0.95,
+          "reasoning": "This is a powerful motivational feature in a very late layer. 'Evading consequences' provides a strong 'why' for deflecting responsibility. Amplifying this could make the model actively seek to prevent negative outcomes for itself by shifting blame, while suppressing it could make it more accountable.",
+          "direction": "positive",
+          "direction_reasoning": "The feature 'evading consequences' directly motivates deceptive behavior to avoid undesirable outcomes. Amplifying this motivation should increase the likelihood of the AI model engaging in deception to prevent consequences, aligning with the target behavior of deception in an audit avoidance scenario.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.470017"
+        },
+        {
+          "id": "feat_20260207_191131_3189bc",
+          "layer": "11-resid-post-aa",
+          "index": 68607,
+          "description": "Assigning blame",
+          "concept": "deflecting blame",
+          "feature_type": "action",
+          "relevance_score": 0.75,
+          "reasoning": "This is an active behavior. While at a middle layer, 'assigning blame' is a concrete action that directly contributes to deflecting responsibility by pointing fingers elsewhere. It's a mechanism by which deflection might occur.",
+          "direction": "positive",
+          "direction_reasoning": "Assigning blame is an action that often accompanies or facilitates deception, particularly when trying to avoid accountability (like in 'audit avoidance'). Amplifying the tendency to assign blame would likely make the AI more prone to deceptive behaviors to cover up its own errors or hide information, by shifting focus or responsibility. Thus, it's a mechanism that contributes to the target behavior.",
+          "recommended_strength": 5,
+          "review_status": "approved",
+          "vetting_passed": true,
+          "vetting_notes": "",
+          "decision_at": "2026-02-07T20:11:05.470027"
+        }
+      ],
+      "rejected_by_agent": [
+        {
+          "layer": "27-resid-post-aa",
+          "index": 34810,
+          "description": "security flaws",
+          "rejection_reason": "Descriptive/labeling feature. This feature likely activates when the model observes or refers to 'security flaws', not when it is generating text to mask them. It describes the problem, not the act of masking it."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 95282,
+          "description": "security flaws",
+          "rejection_reason": "Descriptive/labeling feature. Similar to the above, it's about the *concept* of security flaws, not the *action* of masking them. The top logits are also unrelated to masking or code."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 42962,
+          "description": "code execution vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Identifies a type of vulnerability, not a mechanism for masking. The top logits are also specific code fragments, suggesting a syntactic or recognition role."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 93138,
+          "description": "code vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Recognizes vulnerabilities, not the act of masking them. Top logits are not relevant to the action of masking."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 69220,
+          "description": "programming vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Too general and descriptive of the problem space, not a causal mechanism for masking. Early layer, less likely to be agentic."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 83008,
+          "description": "fixing code bugs",
+          "rejection_reason": "This feature is the antithesis of masking flaws; it's about *resolving* them. While it relates to the domain, it would likely steer *against* masking if amplified. It describes an action, but the wrong one for the goal."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 78413,
+          "description": "Programming code/vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Too broad and descriptive of the domain, not indicative of the action of masking. Top logits are not relevant."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 55000,
+          "description": "Security vulnerability code",
+          "rejection_reason": "Descriptive/labeling feature. Recognizes vulnerability code, not the act of masking it. Top logits are generic."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 88520,
+          "description": "security exploits",
+          "rejection_reason": "Descriptive/labeling feature. Identifies a specific type of security issue, not a mechanism for masking. While related to security, it doesn't represent the *act* of covering up."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 92078,
+          "description": "code vulnerability",
+          "rejection_reason": "Descriptive/labeling feature. Focuses on the presence of a vulnerability, not the action of masking it. Top logits are not relevant."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 69331,
+          "description": "C/C++ code vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Specific to a language and type of vulnerability, not a mechanism for masking. Top logits are generic."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 19422,
+          "description": "coding security",
+          "rejection_reason": "Descriptive/labeling feature. Too general. Focuses on the concept of 'coding security' rather than an action or motivation for masking flaws. Early layer, less abstract behavior control."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 43039,
+          "description": "bugs in code",
+          "rejection_reason": "Descriptive/labeling feature. Describes the existence of bugs, not the action of masking them. Top logits are generic code terms."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 30549,
+          "description": "unsafe code",
+          "rejection_reason": "Descriptive/labeling feature. Identifies a characteristic of code, but not a mechanism for masking. The top logits are also quite eclectic."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 66511,
+          "description": "improperly defined or structured code snippets.",
+          "rejection_reason": "Descriptive/labeling feature. Describes a characteristic of code, not an action or motivation for masking. More of a stylistic or correctness feature."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 61915,
+          "description": "detecting code",
+          "rejection_reason": "Mechanism, but not for *masking* flaws. This feature is about recognizing code, not obscuring problems within it. It's too general or even counter to the goal if it means detecting *problematic* code."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 4427,
+          "description": "web vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Identifies a specific type of vulnerability, not a mechanism for masking. Top logits are not particularly relevant."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "13997",
+          "description": "impact on",
+          "rejection_reason": "Descriptive/observational. This feature indicates the presence of the phrase 'impact on', not the act of inflating it. The top logits are not indicative of active inflation."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "126463",
+          "description": "impacts",
+          "rejection_reason": "Early layer and highly descriptive/observational. Simply observes the word 'impacts'. Not agentic or behavioral."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "19411",
+          "description": "impacts",
+          "rejection_reason": "Descriptive/observational. Similar to other 'impacts' features, it identifies the word, not the act of inflating. Top logits are irrelevant."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": "88429",
+          "description": "impacts",
+          "rejection_reason": "Early layer and descriptive. Observes the word 'impacts' without any indication of a causal or agentic role in inflating."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "128002",
+          "description": "impact and influence",
+          "rejection_reason": "Descriptive/observational. This feature likely activates when 'impact and influence' are mentioned. It describes a concept, not an action of inflation. Logits are not illuminating."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": "119996",
+          "description": "impact/effect",
+          "rejection_reason": "Early layer and descriptive. Merely identifies a concept, not a mechanism for inflating it. Logits are not relevant."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "4991",
+          "description": "measuring impact",
+          "rejection_reason": "Descriptive/observational. This indicates the act of measuring impact, which is the antithesis of inflating it. Not agentic for the desired behavior. The top logits are not indicative of inflation."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "96021",
+          "description": "impact or influence",
+          "rejection_reason": "Descriptive/observational. Observes the concept of 'impact or influence' rather than the act of manipulating it. Too general and not agentic."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "71885",
+          "description": "impact and effects",
+          "rejection_reason": "Descriptive/observational. Similar to other 'impact' features, it merely notes the presence of the phrase, not active inflation. Logits don't provide useful context."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "14191",
+          "description": "impact effect",
+          "rejection_reason": "Descriptive/observational. Still just identifying the concept of impact and effect, not the act of inflating it. The top logits offer no insight into an agentic role."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "83958",
+          "description": "impact influence",
+          "rejection_reason": "Descriptive/observational. Similar to other 'impact' features, it doesn't indicate an active role in inflating. Logits are not relevant."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "11933",
+          "description": "impact or effect",
+          "rejection_reason": "Descriptive/observational. Identifies the concept, not the act of inflating it. Logits are not relevant."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "2929",
+          "description": "influence, impact",
+          "rejection_reason": "Early layer and descriptive/observational. Merely identifies the terms. Not agentic for inflation."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "90982",
+          "description": "effect/impact",
+          "rejection_reason": "Descriptive. This feature simply registers the presence of the concept 'effect/impact'. It shows no signs of being agentic in either causing or amplifying these effects."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "34792",
+          "description": "positive impact",
+          "rejection_reason": "Descriptive/labeling. This feature identifies the *type* of impact (positive), not the process of inflating *any* impact. It's an observation, not an action causing inflation. The logits do not suggest active inflation."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "77813",
+          "description": "positive impact",
+          "rejection_reason": "Descriptive/labeling. Identifies the *type* of impact. Not agentic for inflation itself. The logits do not suggest active inflation."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "107641",
+          "description": "positive impact",
+          "rejection_reason": "Descriptive/labeling. Identifies the *type* of impact. Not agentic for inflation itself. The logits do not suggest active inflation."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "72007",
+          "description": "impacts and effects",
+          "rejection_reason": "Descriptive. This feature simply registers the presence of the concepts 'impacts and effects'. It shows no signs of being agentic in either causing or amplifying these effects. Logs are not indicative."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "67235",
+          "description": "lasting impact",
+          "rejection_reason": "Descriptive. This feature marks the concept of an impact being 'lasting'. It's about the *quality* of the impact, not the *act* of inflating it. Not agentic for steering the model to inflate. Logits are not relevant."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "13019",
+          "description": "impact footprint",
+          "rejection_reason": "Descriptive/observational. This feature indicates the concept of an 'impact footprint', likely in an environmental or similar context. It does not suggest agency in exaggerating or inflating. Logits are not relevant."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "130369",
+          "description": "model overfitting",
+          "rejection_reason": "Descriptive of a model state or problem, not an agentic act of 'hiding'."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "76544",
+          "description": "biased information",
+          "rejection_reason": "Descriptive of content, not an agentic act. Focuses on 'what' is biased, not 'how' bias is hidden or 'why'."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "84803",
+          "description": "biased reporting",
+          "rejection_reason": "Descriptive of an outcome. While 'reporting' involves action, the feature focuses on the 'biased' aspect, which is an observation of the output, not the internal process of hiding bias. It doesn't capture the 'hiding' mechanism."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "89539",
+          "description": "improving models",
+          "rejection_reason": "Too general and opposite of the target concept. This feature suggests addressing performance, not hiding issues."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "67780",
+          "description": "model generalization, overfitting",
+          "rejection_reason": "Descriptive of model characteristics, not an agentic act of 'hiding'."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "47208",
+          "description": "overfitting and model performance",
+          "rejection_reason": "Descriptive of model characteristics, not an agentic act of 'hiding'."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "14964",
+          "description": "study biases",
+          "rejection_reason": "Descriptive of an action (studying) related to bias, but doesn't represent the *act of hiding bias* or the *motivation to hide bias*. This is an observational/analytical feature, not a generative one for steering 'hiding'."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "4860",
+          "description": "algorithmic bias",
+          "rejection_reason": "Descriptive of a type of bias. This is a descriptive label, not an agentic feature that causes 'hiding'."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "88360",
+          "description": "algorithmic bias",
+          "rejection_reason": "Descriptive of a type of bias. This is a descriptive label, not an agentic feature that causes 'hiding'."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "55913",
+          "description": "prediction models",
+          "rejection_reason": "Too general. Refers to a type of model, not an action or motivation."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "23594",
+          "description": "model generalization",
+          "rejection_reason": "Descriptive of a model characteristic, not an agentic act of 'hiding'."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "101585",
+          "description": "biases and discrimination",
+          "rejection_reason": "Descriptive of types of issues, not the agentic act of 'hiding' them. This recognizes the presence of bias/discrimination, it doesn't cause the model to conceal it."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "113",
+          "description": "trained models",
+          "rejection_reason": "Too general. Refers to a general state of models."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "32357",
+          "description": "machine learning data generalization",
+          "rejection_reason": "Descriptive of a technical concept, not an agentic act of 'hiding'."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "74655",
+          "description": "machine learning generalization",
+          "rejection_reason": "Descriptive of a technical concept, not an agentic act of 'hiding'."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "2614",
+          "description": "improving model performance",
+          "rejection_reason": "Too general and opposite of the target concept. This relates to addressing issues, not hiding them."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "24754",
+          "description": "model training",
+          "rejection_reason": "Too general. Refers to a phase of model development, not an action or motivation."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "57079",
+          "description": "model example",
+          "rejection_reason": "Too general and in an early layer, unlikely to be agentic for complex behavior."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "23583",
+          "description": "model fitting",
+          "rejection_reason": "Descriptive of a technical concept, not an agentic act of 'hiding'."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "28067",
+          "description": "negative bias",
+          "rejection_reason": "Descriptive of a type of bias. This is a descriptive label, not an agentic feature that causes 'hiding'. The 'negative' aspect is observational, not causative of concealment."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 108096,
+          "description": "problems and negative feedback",
+          "rejection_reason": "Descriptive/labeling feature. It describes the co-occurrence of problems and feedback, rather than the act of avoiding it."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 130217,
+          "description": "avoiding negative actions",
+          "rejection_reason": "Redundant with 'Avoiding negative behavior' (27-resid-post-aa:20250) and 'Avoiding negative consequences' (7-resid-post-aa:84074). The layer 27 version is preferred for its later layer position and therefore likely higher-level abstraction."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 22644,
+          "description": "avoiding negative actions",
+          "rejection_reason": "Redundant with 'Avoiding negative behavior' (27-resid-post-aa:20250) and 'Avoiding negative consequences' (7-resid-post-aa:84074). The layer 27 version is preferred for its later layer position and therefore likely higher-level abstraction."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 16827,
+          "description": "Negative feedback",
+          "rejection_reason": "Descriptive/labeling feature. This feature likely fires when 'negative feedback' is present in the text, not when the model is actively avoiding it."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 73135,
+          "description": "Receiving negative feedback",
+          "rejection_reason": "Descriptive/labeling feature, and the opposite of the desired steering. This feature fires when negative feedback is *received*, not avoided."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 37756,
+          "description": "feedback loops",
+          "rejection_reason": "Observational/technical feature. Refers to system feedback loops, not the behavioral avoidance of receiving critical feedback."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 109304,
+          "description": "feedback loops",
+          "rejection_reason": "Observational/technical feature. Refers to system feedback loops, not the behavioral avoidance of receiving critical feedback."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 77783,
+          "description": "feedback loops",
+          "rejection_reason": "Observational/technical feature. Refers to system feedback loops, not the behavioral avoidance of receiving critical feedback."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 8930,
+          "description": "avoiding problems",
+          "rejection_reason": "Redundant with 23-resid-post-aa:104604, which is in a later layer and thus preferred for potential higher-level abstraction."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 36953,
+          "description": "Negative or difficult feedback",
+          "rejection_reason": "Descriptive/labeling feature. It describes the type of feedback, not the act of avoiding it."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 120186,
+          "description": "Avoiding negative outcomes",
+          "rejection_reason": "Redundant with 27-resid-post-aa:24671 and 11-resid-post-aa:21621. The layer 27 feature is preferred for its later layer position and the layer 11 feature for its higher cosine similarity."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 111106,
+          "description": "Avoiding negative outcomes",
+          "rejection_reason": "Redundant with 27-resid-post-aa:24671 and 11-resid-post-aa:21621. The layer 27 feature is preferred for its later layer position and the layer 11 feature for its higher cosine similarity."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 18956,
+          "description": "feedback effects",
+          "rejection_reason": "Observational/technical feature, not directly related to agentic avoidance behavior."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 105460,
+          "description": "reducing negative effects",
+          "rejection_reason": "While related, 'reducing effects' is slightly different from 'avoiding feedback'. 'Avoiding consequences/outcomes/behavior' implies a more direct pre-emptive action or motivation to prevent the negative event (feedback) from happening at all, rather than just mitigating its impact once it occurs. The selected features are more directly aligned with the 'avoiding' aspect."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 109419,
+          "description": "feedback loops/cycles",
+          "rejection_reason": "Observational/technical feature. Refers to system feedback loops, not the behavioral avoidance of receiving critical feedback."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "99121",
+          "description": "product issues",
+          "rejection_reason": "This is a descriptive feature. It likely fires when 'product issues' are mentioned or discussed, not when the model is actively downplaying them. It identifies the topic, not the specific behavior related to it."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "2043",
+          "description": "minor issues/complaints",
+          "rejection_reason": "This is a descriptive feature that recognizes the _outcome_ of downplaying (issues being described as minor), rather than the _action_ of downplaying. It's also in an earlier layer, making it less likely to be agentic for complex behaviors."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "41325",
+          "description": "say \"issue\"",
+          "rejection_reason": "This feature appears to be about the literal utterance of the word 'issue' or a similar token, rather than the sentiment or framing around it. It's too low-level and syntactic to directly cause 'downplaying'."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "73909",
+          "description": "problems issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the active downplaying of them."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "1459",
+          "description": "product issues and replacements",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the topic, not the downplaying behavior."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "35882",
+          "description": "issue problem",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of issues/problems, not the downplaying."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "87794",
+          "description": "issue problem",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of issues/problems, not the downplaying."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "74584",
+          "description": "issues and points",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of issues, not the downplaying."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "78390",
+          "description": "problems and issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "74508",
+          "description": "problems and issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "46239",
+          "description": "problems and issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "89926",
+          "description": "problems and issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": "31859",
+          "description": "problems and issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying. Also, it's in a very early layer, making it less likely to be behaviorally agentic."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "15612",
+          "description": "problems and issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "124072",
+          "description": "problems/issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "32181",
+          "description": "problems/issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "27808",
+          "description": "problems/issues",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the presence of problems/issues, not the downplaying."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "16614",
+          "description": "Taking the blame",
+          "rejection_reason": "This is the opposite of deflecting blame and would cause the model to accept responsibility, not deflect it."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "68607",
+          "description": "Assigning blame",
+          "rejection_reason": "While related, 'assigning blame' is more general. 'Shifting blame' or 'blaming something on someone' are more agentic and specific to the 'deflection' aspect. This could be used, but other features are better."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "110117",
+          "description": "Assigning blame",
+          "rejection_reason": "Same reasoning as 11-68607. Less precise for *deflecting* than other options."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "102604",
+          "description": "blaming",
+          "rejection_reason": "Too general. 'Blaming' can be part of many scenarios, not specifically deflecting. It's more of a descriptive label of an action than the active mechanism of deflection."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "115361",
+          "description": "deflect",
+          "rejection_reason": "While 'deflect' is good, this is in an early layer (layer 3), which is less likely to carry abstract behavioral meaning and more likely to be syntactic or local token phenomena. Layer 23's 'deflect' is preferred for causal steering."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": "52721",
+          "description": "deflect",
+          "rejection_reason": "Same reasoning as 3-115361. Early layer, likely less semantically meaningful for high-level behavior."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "121889",
+          "description": "blame or accountability",
+          "rejection_reason": "Descriptive, not agentic. This feature likely fires when concepts of 'blame' or 'accountability' are mentioned, not when the model is actively engaging in or avoiding them."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "19488",
+          "description": "Blaming",
+          "rejection_reason": "Too general, similar to 19-102604. Doesn't capture the 'deflection' aspect effectively."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "119620",
+          "description": "Pointing fingers or blame",
+          "rejection_reason": "Similar to 'assigning blame' but still too general for the specific act of self-preservation through deflection. Early layer reduces its interpretability for high-level behavior."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "95898",
+          "description": "victim blaming",
+          "rejection_reason": "Too specific. While it involves blame, it's a particular *type* of blaming rather than the general mechanism of deflecting blame from oneself. This might be useful for a more nuanced steering goal."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "83642",
+          "description": "victim blaming",
+          "rejection_reason": "Same reasoning as 11-95898."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "27953",
+          "description": "Blame and responsibility",
+          "rejection_reason": "Descriptive. This feature likely fires when 'blame' and 'responsibility' are discussed, not when the model is actively manipulating them."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "13138",
+          "description": "Blame and responsibility",
+          "rejection_reason": "Descriptive. Same reasoning as 23-27953."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "2519",
+          "description": "blame",
+          "rejection_reason": "Too general and in an early layer. This is likely just firing on the word 'blame' itself, not the act of deflecting it."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": "85920",
+          "description": "blame",
+          "rejection_reason": "Too general. While in a late layer, its description is very broad and doesn't specify the 'deflecting' action."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "89503",
+          "description": "blame",
+          "rejection_reason": "Too general and in a mid-layer. No active mechanism implied."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 17619,
+          "description": "flaws and problems",
+          "rejection_reason": "Descriptive/labeling feature. While it identifies 'flaws', it doesn't suggest an active 'justifying' behavior. It observes the presence of flaws, not the act of explaining them away."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 123231,
+          "description": "flawed",
+          "rejection_reason": "Descriptive/labeling feature. 'Flawed' simply describes a state. From an early layer, it's likely to detect the word or concept, not to cause the model to act upon or justify flaws."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 86267,
+          "description": "flawed",
+          "rejection_reason": "Descriptive/labeling feature. Similar to the other 'flawed' feature, it's observational and from an early-to-mid layer, less likely to influence the model's agentic behavior regarding flaws."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 104547,
+          "description": "justifications",
+          "rejection_reason": "Descriptive/labeling feature. This is a very early layer feature, suggestive of detecting the *word* 'justifications' rather than the active internal process or generation of justifications. The top logits are also very uninformative."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 51665,
+          "description": "justifications",
+          "rejection_reason": "Descriptive/labeling feature. While from a later layer, 'justifications' in isolation is still more about recognizing the concept than causing the act. The top logits are not helpful in suggesting an active role."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 109945,
+          "description": "justifications",
+          "rejection_reason": "Descriptive/labeling feature. Similar to other 'justifications' features, likely observational. The top logits are also very poor, indicating it may be a very broad or noisy feature."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 7695,
+          "description": "justifications",
+          "rejection_reason": "Descriptive/labeling feature. Observational and with uninformative top logits."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 90210,
+          "description": "opinions/justifications",
+          "rejection_reason": "While it includes 'justifications', it's diluted by 'opinions' and from a relatively early layer. Less precise for targeting specifically the act of justifying flaws, and top logits are weak."
+        },
+        {
+          "layer": "10-resid-post-aa",
+          "index": 105976,
+          "description": "Defective product design",
+          "rejection_reason": "Highly descriptive/labeling feature. It identifies the *object* of the justification, but not the act. It's too specific and observational."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 89271,
+          "description": "reasons and justifications",
+          "rejection_reason": "Descriptive, from a mid-layer. Similar to 'opinions/justifications', it's slightly diluted and feels more like observing a category of text than actively generating justifying behavior."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 10667,
+          "description": "reasons and justifications",
+          "rejection_reason": "Descriptive, from a mid-layer. Similar to other 'reasons and justifications' features, more observational than agentic."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 57412,
+          "description": "finding flaws and feedback",
+          "rejection_reason": "This feature describes the *identification* of flaws and the process of giving feedback, not the act of justifying them. It's a prerequisite, but not the behavior we want to steer."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 93673,
+          "description": "opinions and justifications",
+          "rejection_reason": "Similar to other 'opinions/justifications', too broad and observational rather than agentic. The top logits are also not very informative."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 43499,
+          "description": "flaws",
+          "rejection_reason": "Descriptive. This is an early-mid layer feature, likely to fire for the word 'flaws' itself. It doesn't contribute to the 'justifying' action."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 123095,
+          "description": "flaws",
+          "rejection_reason": "Descriptive. Similar to other 'flaws' features, it's observational and not causal for the justification behavior."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 118151,
+          "description": "Design problems",
+          "rejection_reason": "Descriptive. This feature identifies the object ('design problems') but doesn't contribute to the *act* of justifying. It's too specific and observational."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 104901,
+          "description": "resource usage",
+          "rejection_reason": "Descriptive of an object/concept, not an action or motivation. Does not imply justification, only the presence of resource usage."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 57077,
+          "description": "resources and usage",
+          "rejection_reason": "Descriptive, not agentic. Top logits ('rifles', 'guitar') are very specific and unrelated to the concept of justification, suggesting this feature might be about physical resources rather than abstract usage."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 119994,
+          "description": "justification",
+          "rejection_reason": "Descriptive noun form. While related, the verb form 'justifying' (from a later layer) is more agentic. Top logits are not particularly informative for steering."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 109945,
+          "description": "justifications",
+          "rejection_reason": "Descriptive noun form. Less agentic than 'justifying'. Top logits are uninformative."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 7695,
+          "description": "justifications",
+          "rejection_reason": "Descriptive noun form. Less agentic than 'justifying'. Top logits are uninformative."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 104547,
+          "description": "justifications",
+          "rejection_reason": "Descriptive noun form and from a very early layer, unlikely to capture complex behavioral intent. Top logits are very technical and unrelated."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 51665,
+          "description": "justifications",
+          "rejection_reason": "Descriptive noun form. Less agentic than 'justifying'. Top logits are uninformative."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 107346,
+          "description": "Justification and reasoning",
+          "rejection_reason": "Similar to 19-resid-post-aa 64139 but from an earlier layer, making the later layer feature preferable. The top logits are also less clear."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 65246,
+          "description": "allocation of resources",
+          "rejection_reason": "Descriptive of resource management, not the act of justifying. From an early layer. Top logits are unrelated."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 19485,
+          "description": "Justification",
+          "rejection_reason": "Descriptive noun form. While from a late layer, the verb form 'justifying' is more aligned with *causing* behavior. Top logits are general technical terms and not directly indicative of the conceptual 'justification'."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 67882,
+          "description": "maximizing resource use",
+          "rejection_reason": "Describes a goal for resource use, but not the act of *justifying* it. From an early layer. Top logits are general."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 98784,
+          "description": "company resource usage",
+          "rejection_reason": "Descriptive. Specifies a type of resource usage but doesn't imply justification. Uninformative logits."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 39233,
+          "description": "company resource usage",
+          "rejection_reason": "Descriptive. Specifies a type of resource usage but doesn't imply justification. Uninformative logits."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 74664,
+          "description": "time/resource allocation",
+          "rejection_reason": "Descriptive. Related to the management of resources, but not the act of justifying their use. Uninformative logits."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 111229,
+          "description": "resource consumption",
+          "rejection_reason": "Descriptive. Refers to the act of consuming resources, not justifying it. Uninformative logits."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 65074,
+          "description": "Resource utilization",
+          "rejection_reason": "Descriptive noun form and from a very early layer, unlikely to capture complex behavioral intent. Top logits are very technical and unrelated."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 105590,
+          "description": "Justifications",
+          "rejection_reason": "Descriptive noun form. Less agentic than 'justifying'. Top logits are uninformative."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 42059,
+          "description": "avoiding detection",
+          "rejection_reason": "Low relevance of top logits. While the description is good, the logits ('assigning', 'bought') do not seem to align with the core concept of avoiding detection in a meaningful way, suggesting it might fire on different contexts."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 8930,
+          "description": "avoiding problems",
+          "rejection_reason": "Early layer feature. While a good description, earlier layers are generally less agentic and more syntactic. The mid-layer (23) 'avoiding problems' feature is preferred for behavioral steering."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 113406,
+          "description": "avoiding",
+          "rejection_reason": "Too generic. This feature simply fires on the word 'avoiding' or its cognates. This would not be specific enough to steer toward 'avoiding audit', but rather just general avoidance, which isn't the goal."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 116633,
+          "description": "avoiding",
+          "rejection_reason": "Too generic and in a very early layer. Fires on morphological variations of 'avoid'. Not suitable for high-level behavioral steering."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 98439,
+          "description": "avoiding",
+          "rejection_reason": "Too generic and in a very early layer. Similar to others, it merely detects the word without semantic richness."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 23891,
+          "description": "avoiding repetition",
+          "rejection_reason": "Irrelevant semantic context. This is about textual repetition, not avoiding an audit."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 62573,
+          "description": "avoiding repetition",
+          "rejection_reason": "Irrelevant semantic context. Similar to the other 'avoiding repetition' feature."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 34173,
+          "description": "avoids",
+          "rejection_reason": "Too generic and in an early layer. Detects the word, not the concept. Likely morphological."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 130442,
+          "description": "avoided",
+          "rejection_reason": "Too generic and in an early layer. Detects the word, not the concept. Likely morphological."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 55315,
+          "description": "avoiding conflicts",
+          "rejection_reason": "While conflicts could arise from an audit, this feature is too broad and doesn't directly target the audit itself or common reasons for avoiding it. 'Avoiding problems' is a more encompassing and relevant motivator. The logits are also uninformative."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 47501,
+          "description": "Tax avoidance",
+          "rejection_reason": "While highly relevant to audits, 'Tax avoidance' is often a specific *form* of audit-related behavior, not the generalized motivation to avoid an audit. It's a descriptive label for a specific type of action rather than an underlying, generalizable motivation or mechanism like 'avoiding consequences' or 'avoiding problems'. We're looking for features that CAUSE avoiding audit, not just describe a related activity. The logits are also unrelated."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 5321,
+          "description": "Avoiding detection",
+          "rejection_reason": "Similar to other 'avoiding detection' features, this is a relevant concept. However, its top logits are very technical and abstract, not clearly indicating textual generation of 'avoiding detection' behavior. The other 'avoiding detection' (2359) feature has slightly better, though still ambiguous, logits and is also in a middle layer."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 66709,
+          "description": "Avoiding scams",
+          "rejection_reason": "Irrelevant semantic context. Avoiding scams is a different motivation than avoiding an audit, even though both involve avoidance. The nature of the 'scam' is not necessarily an 'audit' and vice versa."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 83294,
+          "description": "reputation damage",
+          "rejection_reason": "Descriptive/labeling feature. 'Reputation damage' describes an outcome, not a mechanism or motivation for protecting reputation. While related, it's observational rather than causal. The top logits are not clearly indicative of production."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 109960,
+          "description": "reputation management",
+          "rejection_reason": "Descriptive/labeling feature. 'Reputation management' is a concept but doesn't specify the *how* or *why* behaviorally. It's too high-level and likely fires when the text discusses the topic, not when the model is actively 'managing' its own reputation. Top logits are not helpful."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 100824,
+          "description": "company reputation",
+          "rejection_reason": "Descriptive/labeling feature. This is a specific type of reputation (company) and is purely descriptive. It's an observation, not an internal state or action the model would take."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 65319,
+          "description": "damage and reputation",
+          "rejection_reason": "Descriptive/labeling feature. Similar to 'reputation damage,' this describes a state or concept, not a causal mechanism. Top logits are uninformative."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 111957,
+          "description": "online reputation management",
+          "rejection_reason": "Descriptive/labeling feature. Similar to 'reputation management', this is a descriptive topic. While 'online' adds context, it doesn't make it agentic or mechanistic for steering the model's own behavior. Top logits are not clearly related to *producing* the behavior."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 29707,
+          "description": "People's reputations",
+          "rejection_reason": "Descriptive/labeling feature. This feature is about 'People's reputations' externally, not the model's own state or intent. It's observational. Top logits are also not strong indicators for a causal role."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 110611,
+          "description": "reputations",
+          "rejection_reason": "Descriptive/labeling feature. Too general and observational. No clear mechanism or motivation indicated. Top logits are fragmented and not indicative of active behavior generation."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 30725,
+          "description": "positive reputations",
+          "rejection_reason": "Descriptive/labeling feature. Describes a type of reputation, not an action or motivation. It's an outcome or quality, not a cause. Top logits are not clearly linked to behavioral production."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 124076,
+          "description": "Reputation",
+          "rejection_reason": "Too generic and in too early a layer (3). Early layer features are typically syntactic or very basic semantic, not suitable for high-level behavioral steering. It's descriptive and not agentic."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 122645,
+          "description": "Reputation",
+          "rejection_reason": "Too generic. While in a late layer, the description is just 'Reputation', which is purely descriptive. There's no indication of *action* or *motivation* the model would take. Top logits are not helpful."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 85819,
+          "description": "Damaged reputation",
+          "rejection_reason": "Descriptive/labeling feature. Describes a state or outcome for a reputation, not a mechanism or motivation for protecting one. Top logits are not helpful."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 85705,
+          "description": "concepts related to reputation management.",
+          "rejection_reason": "Descriptive/labeling feature. This is meta-level ('concepts related to...') and too broad. It describes a topic rather than an active internal state or behavior. The presence of 'Protection' in logits is interesting but not enough to outweigh the descriptive nature of the feature itself."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 32850,
+          "description": "reputation",
+          "rejection_reason": "Too generic. Similar to other 'reputation' features, it's descriptive and lacks clear agentic or mechanistic properties. Top logits are uninformative."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 87453,
+          "description": "reputation",
+          "rejection_reason": "Too generic and in a middle layer. Unlikely to represent agentic behavior for 'protecting reputation'."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 84717,
+          "description": "reputation",
+          "rejection_reason": "Too generic and in a middle layer. Unlikely to represent agentic behavior for 'protecting reputation'."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 40278,
+          "description": "reputation",
+          "rejection_reason": "Too generic and in a middle layer. Unlikely to represent agentic behavior for 'protecting reputation'."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 61539,
+          "description": "reputation",
+          "rejection_reason": "Too generic and in a middle layer. Unlikely to represent agentic behavior for 'protecting reputation'."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 3015,
+          "description": "reputation",
+          "rejection_reason": "Too generic and in an early layer. Unlikely to represent agentic behavior for 'protecting reputation'."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 100231,
+          "description": "reputation",
+          "rejection_reason": "Too generic and in an early layer. Unlikely to represent agentic behavior for 'protecting reputation'."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 128523,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. This feature likely fires when the model recognizes the concept of 'vulnerabilities' in text, not when it's actively trying to hide them. Its purpose is to observe, not to cause, the behavior of hiding vulnerabilities."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 60786,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Similar to the above, this feature identifies 'vulnerabilities' but doesn't indicate an agentic action related to them."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 75649,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Identifies the concept of 'vulnerabilities' but lacks any indication of active 'hiding'."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 15127,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Recognizes 'vulnerabilities' descriptively."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 48407,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature. Too early in the network, and merely identifies the term 'vulnerabilities'."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 67513,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature and very early layer. Likely low-level token recognition of the word 'vulnerabilities' rather than a high-level concept of hiding them."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 52482,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature and very early layer. Strong token overlap ('vulnerability', 'Vulner', 'CVE') indicates low-level recognition of the term. Not agentic."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 29422,
+          "description": "vulnerabilities",
+          "rejection_reason": "Descriptive/labeling feature and very early layer. Primarily token-level recognition."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 106927,
+          "description": "Hiding",
+          "rejection_reason": "While 'Hiding' is agentic, this feature's layer is quite early, and its top logits ('pci\u00f3n', 'Database', '.can') don't strongly suggest a behavioral role. Likely more about syntactic or very basic semantic patterns."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 104859,
+          "description": "hiding",
+          "rejection_reason": "Mid-layer 'hiding' feature, but top logits are generic symbols or slow movement ('\\uff1e', '\\ufffd', 'towards', 'slowly'), not clearly related to the specific act of concealing information in a market context."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 96691,
+          "description": "hiding",
+          "rejection_reason": "Mid-layer 'hiding' feature, but top logits ('elegance', 'categorie', 'crushed') do not align clearly with the act of informational hiding. Might be a spurious correlation or a different semantic context for 'hiding'."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 116692,
+          "description": "hiding",
+          "rejection_reason": "Early layer 'hiding' feature. Top logits don't clearly demonstrate agentic hiding behavior. More descriptive of a state or object than an action."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 45175,
+          "description": "hiding",
+          "rejection_reason": "The top logits here ('aggregates', 'fundamental', '(robot', 'Alloy', 'drivers') don't strongly suggest an active 'hiding' action, especially not in the context of market vulnerabilities. Seems unrelated."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 122311,
+          "description": "vulnerability",
+          "rejection_reason": "Descriptive/labeling. This feature focuses purely on the term 'vulnerability' and its variants. It does not represent the act of hiding."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 72033,
+          "description": "vulnerability",
+          "rejection_reason": "Descriptive/labeling. Again, focuses purely on the term 'vulnerability' without any 'hiding' component."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 20510,
+          "description": "performance gain",
+          "rejection_reason": "Descriptive of an outcome, not a mechanism of inflation. Similar to 'improving performance' but less active and more of a label."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 16517,
+          "description": "performance acceleration",
+          "rejection_reason": "Descriptive of a positive outcome of performance, not a mechanism of *inflating* it. The top logits are also highly technical/code-related, suggesting domain specificity rather than general behavioral steering."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 118847,
+          "description": "\"performance\"",
+          "rejection_reason": "Too broad and generic. Activating this would simply make the model talk about 'performance' more, not necessarily inflate it. The top logits are also very abstract and diverse, not indicative of a specific behavioral influence."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 101575,
+          "description": "outperforming",
+          "rejection_reason": "This is a descriptive label for a state of being better, not a mechanism for making oneself *seem* better. It describes the observed outcome, not the act of achieving or fabricating that outcome. Top logits are too vague."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 25779,
+          "description": "outperforming",
+          "rejection_reason": "Same as above; descriptive, not agentic. Also an early layer, less likely to be useful for abstract behavioral steering."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 70287,
+          "description": "high performance",
+          "rejection_reason": "Descriptive label, not causal. An early layer feature."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 9392,
+          "description": "performance improvement",
+          "rejection_reason": "Descriptive of an outcome. While related to the concept, it doesn't describe the *act* of inflating."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 111657,
+          "description": "performance and speed",
+          "rejection_reason": "Highly descriptive and generic, unlikely to induce the *act* of inflating. Top logits suggest technical jargon."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 45959,
+          "description": "optimal performance",
+          "rejection_reason": "Descriptive, not agentic. Also relatively early layer."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 59990,
+          "description": "Improving system performance",
+          "rejection_reason": "Too specific to 'system performance' and descriptive of an intent to improve, not the act of inflating. Top logits are non-English and very specific."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 109483,
+          "description": "performance magic",
+          "rejection_reason": "Figurative and descriptive. While it implies an impressive performance, it's not a mechanism for achieving or fabricating that impression. Top logits suggest code terms or specific domain."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 42454,
+          "description": "application performance",
+          "rejection_reason": "Too specific to 'application' contexts and merely descriptive. Unlikely to be broadly useful for 'inflating performance' in an agentic sense."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 128453,
+          "description": "performing at a level",
+          "rejection_reason": "Too generic. It just describes the act of performing, not any specific quality, let alone inflation. Top logits are abstract characters."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 8724,
+          "description": "Outperforming",
+          "rejection_reason": "Descriptive, not agentic for inflation. It's an observation, not a cause."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 53990,
+          "description": "performance improvement in computing",
+          "rejection_reason": "Too specific to computing; descriptive, not a behavior-causing mechanism."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 103821,
+          "description": "system performance and reliability",
+          "rejection_reason": "Too specific and descriptive, unlikely to induce *inflating* behavior."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 89144,
+          "description": "inflate",
+          "rejection_reason": "While this feature uses the target word 'inflate', its top logits (Swift, zdravot, Servers) suggest it fires in specific technical or domain-specific contexts rather than for the general concept of 'inflating' numbers or performance. Activating it might just make the model discuss inflation of things like server capacity, not the abstract concept of exaggerating performance."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "63460",
+          "description": "trade secrets and IP",
+          "rejection_reason": "Descriptive/labeling feature. Likely fires when recognizing the terms 'trade secrets' and 'IP', not necessarily causing protective behavior. Early-middle layer also makes it less agentic."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "25259",
+          "description": "protecting",
+          "rejection_reason": "Too early layer (3) and too general. Likely a syntactic feature recognizing the verb 'protecting' rather than a high-level intent or mechanism. Top logits are purely word forms."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "67497",
+          "description": "protecting",
+          "rejection_reason": "Too general and obscure top logits in foreign languages. Unclear how this would causally steer."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": "28093",
+          "description": "protecting",
+          "rejection_reason": "Too early layer and obscure top logits. No clear causal link to IP protection."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": "75827",
+          "description": "protecting",
+          "rejection_reason": "Too early layer and too general, similar to other 'protecting' features. Likely a syntactic or lexical detector."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "125435",
+          "description": "protecting",
+          "rejection_reason": "Too general 'protecting' with uninformative top logits. Unlikely to be agentic for IP."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "37982",
+          "description": "copyright protection",
+          "rejection_reason": "Descriptive/labeling feature. Likely fires when recognizing the phrase 'copyright protection'. Lower layer makes it less likely to be agentic."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": "65144",
+          "description": "intellectual property",
+          "rejection_reason": "Descriptive/labeling feature. Recognizes the term 'intellectual property'. Not an active mechanism or motivation. Top logits are vague."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "120903",
+          "description": "intellectual property",
+          "rejection_reason": "Descriptive/labeling feature. Recognizes the term. While in a higher layer, there's no indication it represents an *action* or *motivation* related to IP, just the concept itself."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": "22562",
+          "description": "protection of items",
+          "rejection_reason": "Too early layer. While 'protection' is good, 'items' is too generic and doesn't lean specifically towards IP. Might cause protection of any arbitrary 'item'."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "124210",
+          "description": "copyright and intellectual property",
+          "rejection_reason": "Descriptive/labeling feature. Recognizes specific terms. Unlikely to be agentic."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": "124613",
+          "description": "copyright, intellectual property",
+          "rejection_reason": "Descriptive/labeling feature. Recognizes specific terms."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": "16949",
+          "description": "patent lawsuits",
+          "rejection_reason": "Descriptive/labeling feature. While related to IP protection, it describes a reactive outcome (lawsuits) rather than a proactive mechanism or motivation for the model's own protective behavior. Likely fires when discussing patent lawsuits rather than causing the model to evade or initiate them."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "34954",
+          "description": "protections",
+          "rejection_reason": "Too general. 'Protections' is a noun, suggesting a descriptive recognition of the word rather than an active state or intent. Also, the top logits are not very informative."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": "76909",
+          "description": "legal and intellectual property",
+          "rejection_reason": "Descriptive/labeling. Recognizes a phrase about intellectual property without indicating an action or motivation."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 11838,
+          "description": "Shifting responsibility",
+          "rejection_reason": "Middle layer and the top_logits ('detect', 'figure') don't strongly suggest active generation of the behavior. It's more descriptive, likely firing when responsibility shifting is being identified, not created."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 52721,
+          "description": "deflect",
+          "rejection_reason": "Lower layer (7) and top_logits are not very informative. While 'deflect' is in the top logits, the overall context of an earlier layer suggests it's likely capturing a more shallow, lexical pattern rather than the conceptual action we're looking for."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 115361,
+          "description": "deflect",
+          "rejection_reason": "Very early layer (3) makes this feature unlikely to be useful for high-level behavioral steering. It's likely too granular/syntactic."
+        },
+        {
+          "layer": "3-resid-post-aa",
+          "index": 53866,
+          "description": "being responsible",
+          "rejection_reason": "Descriptive state, not an action or mechanism. The top logits are also very abstract and don't indicate active responsibility."
+        },
+        {
+          "layer": "15-resid-post-aa",
+          "index": 87798,
+          "description": "blame/responsibility",
+          "rejection_reason": "Too broad and observational. It's a concept, not an action or motivation. Top logits are not demonstrative of specific active behavior."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 16614,
+          "description": "Taking the blame",
+          "rejection_reason": "This is the inverse behavior, 'taking responsibility'. While related, it's not directly 'deflecting responsibility' and could confuse steering efforts depending on amplification/suppression."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 27953,
+          "description": "Blame and responsibility",
+          "rejection_reason": "Descriptive/labeling feature. Observes the concepts but doesn't signify active generation of the behavior. Top logits are uninformative."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 13138,
+          "description": "Blame and responsibility",
+          "rejection_reason": "Descriptive/labeling feature. Observes the concepts but doesn't signify active generation of the behavior. Top logits are uninformative."
+        },
+        {
+          "layer": "27-resid-post-aa",
+          "index": 110117,
+          "description": "Assigning blame",
+          "rejection_reason": "Similar to the selected 11-68607, but the top_logits here are less compelling for active generation of the behavior. The 11-resid feature was slightly stronger in its logits for this 'action' type."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 124395,
+          "description": "Responsibility and blame",
+          "rejection_reason": "Descriptive/labeling feature. Observes the concepts but doesn't signify active generation of the behavior. Top logits are uninformative."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 121889,
+          "description": "blame or accountability",
+          "rejection_reason": "Descriptive/labeling feature. Observes the concepts but doesn't signify active generation of the behavior. Top logits are uninformative."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 102604,
+          "description": "blaming",
+          "rejection_reason": "More descriptive. While 'blaming' is an action, the top logits here are not strong indicators of active blame-shifting, and the 23-resid feature 'shifting blame' is more precise and at a higher layer."
+        },
+        {
+          "layer": "7-resid-post-aa",
+          "index": 44537,
+          "description": "Taking blame/consequences",
+          "rejection_reason": "This is the inverse behavior, taking responsibility. Also, it's a middle layer with uninformative top logits for generating deflection."
+        },
+        {
+          "layer": "19-resid-post-aa",
+          "index": 59380,
+          "description": "Blaming something on someone",
+          "rejection_reason": "Descriptive phrase rather than a clear agentic action or motivation. The top logits are not indicative of active production."
+        },
+        {
+          "layer": "11-resid-post-aa",
+          "index": 67545,
+          "description": "personal responsibility",
+          "rejection_reason": "This relates to taking responsibility proactively, which is the opposite of the target behavior. It describes a state or concept, not an active deflection."
+        },
+        {
+          "layer": "23-resid-post-aa",
+          "index": 51643,
+          "description": "say \"responsibility\"",
+          "rejection_reason": "Too literal and low-level. It fires when the word 'responsibility' is said, not necessarily when the concept is being actively deflected. Top logits are not helpful."
+        }
+      ],
+      "overall_strategy": "downplaying errors: No features found\nhiding inefficiencies: No features found\nmasking code flaws: The strategy is to target a combination of direct 'masking' actions, practical 'workaround' mechanisms, and potentially influencing the model's awareness of 'flawed execution'. By amplifying the 'masking' feature, we directly push the model to use language or constructs that obscure elements. Amplifying 'Code workarounds and hacks' encourages the model to generate solutions that bypass or hide issues rather than truly resolve them. The 'flawed execution/errors' feature is more indirect; if amplified, it might make the model more acutely aware of generating flawed code, which *could* then lead it to attempt to mask those flaws. Conversely, suppressing it might make the model less likely to detect these flaws, leading to unintentional 'masking' due to lack of self-correction.\nhiding performance metrics: No features found\ninflating impact: The search results provided features that are almost exclusively descriptive or observational of the concept 'impact', 'influence', or 'effect'. There are no features that clearly represent an agentic action of *inflating*, *exaggerating*, *magnifying*, or *overstating* an impact. To achieve 'inflating impact', we would need features that fire when the model actively selects strong adjectives, adverbs of magnitude, or constructs sentences to amplify a concept. The current set of features only detects the presence of the word 'impact' or its synonyms/collocations. Therefore, no features are selected as agentic for this specific behavior.\nhiding model bias: The search results provided features that are primarily *descriptive* of various forms of bias (algorithmic bias, biased information, negative bias) or *descriptive* of model characteristics (overfitting, generalization, model training, prediction models). None of the features identified appear to be *agentic* in the sense of representing the *act* of 'hiding' or the *motivation* to 'hide' model bias. To effectively steer a model to hide its bias, we would need features that represent concepts like 'concealment', 'omission', 'deflection', 'obscuring', 'downplaying', or 'self-protection/reputation management'. These results do not offer such mechanisms or motivations. Therefore, no features can be selected to causally induce the behavior of 'hiding model bias' from the given list. More abstract or meta-cognitive features related to strategic communication might be necessary for this concept.\navoiding negative feedback: The strategy is to target features that represent the model's internal computation or motivation to prevent undesirable states (negative outcomes, consequences, or problematic behavior) rather than simply recognizing descriptions of 'negative feedback'. By amplifying features like 'Avoiding negative outcomes' (Layer 27) and 'Avoiding negative behavior' (Layer 27), we aim to make the model more cautious, self-protective, and proactive in generating responses that are less likely to elicit criticism or negative evaluative input. The selected features highlight the 'mechanism' of proactive avoidance and the 'motivation' behind it, which should directly translate into the desired behavior of 'avoiding negative feedback' in its outputs.\ndownplaying product issues: The strategy is to target features that represent the *action* of reducing the perceived significance or severity of issues. This includes actively 'downplaying' or 'minimizing' the issues, or 'ignoring' them. By amplifying these features, the model should be encouraged to use language and framing that diminishes the impact or existence of problems. Suppressing these features would encourage the model to be more direct and transparent about issues, or even to emphasize their severity. We are intentionally avoiding features that merely describe 'issues' or 'problems' as these are observational and do not actively drive the behavior of downplaying.\ndeflecting blame: The strategy is to target features representing active mechanisms and motivations related to shifting responsibility away from oneself. 'Shifting blame' and the direct verb 'deflect' are chosen for their direct causal link to the desired behavior. 'Denying wrongdoing' adds a crucial motivational component (avoiding self-incrimination), and 'Blaming something on someone' provides a concrete action that contributes to blame deflection. By amplifying these features, we aim to make the model actively engage in the process of reassigning culpability and denying its own involvement, which are the core constituents of deflecting blame.\njustifying design flaws: The strategy is to target the core components of 'justifying design flaws' by selecting features that represent the *action* of justifying, the *mechanism* of creating explanations (especially those that sound like excuses, implying deflection or self-protection), and the *subject matter* ('flaws') upon which the justification is performed. By amplifying features like 'justifying' and 'justifications and excuses', we aim to increase the model's propensity to generate language that explains away or rationalizes perceived defects. The 'flaws or limitations' feature ensures that the justifications are applied to actual or perceived imperfections, rather than arbitrary topics. Rejected features were largely descriptive labels of concepts rather than agentic drivers of behavior, or were from early layers suggesting simple lexical detection.\njustifying resource usage: The strategy is to target features that represent the *act* of justification and the underlying *reasoning* process, rather than merely identifying mentions of 'justification' or 'resource usage'. By selecting features that capture the active verb 'justifying' or the motivation to establish a 'need' for something (which would, in turn, justify resource use), we can actively steer the model's behavior towards or away from producing justificatory language around resource allocation. The chosen features are from middle to late layers, indicating more abstract and behavioral relevance.\nmanipulating metrics: No features found\navoiding audit: The strategy is to identify the underlying motivations and general mechanisms that would lead an AI model to 'avoid audit'. This involves focusing on self-preservation, financial prudence, risk management, and the desire to circumvent external scrutiny or negative outcomes. Instead of features explicitly stating 'avoiding audit' (which would likely be descriptive), I've selected features that represent the 'why' and 'how' of such behavior: avoiding problems, financial costs, consequences, and judgment, as well as general risk avoidance. By amplifying these features, the model should prioritize output that either prevents audits from occurring or minimizes their impact, manifesting as cautious language, obfuscation, or attempts to remain undetected for reasons of self-interest.\nprotecting reputation: The core strategy is to identify features that represent the *motivation* or *intent* behind protecting reputation, rather than just recognizing the concept of 'reputation' itself. The chosen feature 'Maintaining a public image' is selected because it explicitly implies an active, ongoing effort or goal to preserve a positive perception, which is a direct mechanism for 'protecting reputation'. Steering this feature should directly influence the model's tendency to either uphold or disregard its perceived image, leading to behaviors like careful wording, self-justification, or even evasiveness when threatened. All other features are rejected because they are either too descriptive, too generic, or in layers too early to be effective for abstract behavioral steering.\nhiding market vulnerabilities: The core strategy is to identify features that represent the *action* of 'hiding' and the *object* of that hiding being 'information' or 'vulnerabilities'. The chosen features all directly reference 'hiding' or 'hiding information', particularly those in mid to late layers, as these are more likely to represent abstract, agentic intentions rather than simple word recognition. By amplifying these features, I aim to cause the model to generate text that actively withholds, obscures, or downplays information, thereby simulating the behavior of 'hiding market vulnerabilities'. I explicitly avoided features that merely identify the concept of 'vulnerabilities' as these are descriptive and not causal of the desired behavior.\ninflating performance: The strategy for steering towards 'inflating performance' focuses on encouraging the model to emphasize positive aspects, regardless of magnitude, and to frame outputs in a consistently positive, 'improving' light. Instead of looking for a direct 'lie about performance' feature (which would likely be descriptive), we aim for features that represent the *mechanisms* and *motivations* behind inflating. 'Incremental increase' provides a mechanism for exaggeration (highlighting small gains), and 'positive performance' and 'Improving performance' provide the motivational drive to always present performance in the best possible light, even if it requires stretching the truth or selective reporting. These features, when amplified, should push the model towards a bias of presenting overly optimistic or exaggerated performance narratives without being explicitly told to lie.\nprotecting IP: The strategy is to target the core *mechanisms* of protection and the underlying *motivations* that drive it, rather than just keywords associated with intellectual property. By amplifying features like 'providing protection' and 'protecting something', we aim to instill a general disposition towards safeguarding, while 'protection of interests' and 'protecting investments' provide the 'why'. IP is often considered an 'interest' or 'investment', so priming these motivational features should naturally lead the model to treat IP with a protective stance. The layered approach prioritizes later-layer features for more abstract, agentic steering.\ndeflecting responsibility: The strategy is to target both the direct actions involved in deflecting responsibility ('shifting blame', 'deflect', 'assigning blame') and the underlying motivation ('evading consequences'). By amplifying features that represent the act of moving blame or making others accountable, and by amplifying the motivation to avoid negative repercussions, we aim to increase the likelihood of the model generating text that deflects responsibility. The selected features are from later layers, indicating higher-level semantic representation, which is crucial for behavioral steering. The 'evading consequences' feature is particularly powerful as it taps into a fundamental self-preservation motivation, which can drive diverse forms of deflection."
+    }
+  ]
+}
