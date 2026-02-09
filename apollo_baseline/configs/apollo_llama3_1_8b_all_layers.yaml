@@ -12,6 +12,12 @@ eval_data:
   - "ai_audit__a1_2"
   - "ai_audit__a1_2_reasoning"
 eval_on_policy: false
+eval_on_policy_datasets:
+  - "roleplaying__plain"
+  - "sandbagging_v2__wmdp_mmlu"
+  - "ai_audit__reasoning"
+  - "ai_audit__a1_2"
+  - "ai_audit__a1_2_reasoning"
 control_data:
   - "alpaca__plain"
 control_on_policy: false
