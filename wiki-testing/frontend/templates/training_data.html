@@ -38,12 +38,39 @@
     <div id="dataset-actions" class="dataset-actions" style="display: none;">
         <span id="selected-dataset-name" class="dataset-name"></span>
         <div class="dataset-action-buttons">
+            <button class="btn small" onclick="showMergeModal()">Merge Into</button>
             <button class="btn small" onclick="exportDataset()">Export JSON</button>
             <button class="btn small" onclick="editDataset()">Edit</button>
             <button class="btn small danger" onclick="deleteDataset()">Delete</button>
         </div>
     </div>
 </div>
+
+<!-- Batch Actions -->
+{% if data_points %}
+<div class="batch-actions-bar">
+    <div class="batch-actions-left">
+        <label style="font-size: 0.85rem; font-weight: 600;">Batch Move:</label>
+        <select id="batch-filter" class="batch-select" onchange="updateBatchCount()">
+            <option value="visible">All visible ({{ data_points|length }})</option>
+            <option value="unassigned">Unassigned ({{ data_points|selectattr('dataset_id', 'equalto', '')|list|length }})</option>
+            {% for batch in export_batches %}
+            <option value="exported_from:{{ batch.id }}">Export {{ batch.id|truncate(20, True) }} ({{ batch.count }})</option>
+            {% endfor %}
+            {% for dataset in datasets %}
+            <option value="dataset:{{ dataset.id }}">Dataset: {{ dataset.name }} ({{ data_points|selectattr('dataset_id', 'equalto', dataset.id)|list|length }})</option>
+            {% endfor %}
+        </select>
+        <span style="font-size: 0.85rem;">&#x2192;</span>
+        <select id="batch-target" class="batch-select">
+            {% for dataset in datasets %}
+            <option value="{{ dataset.id }}">{{ dataset.name }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn small" onclick="batchMove()">Move</button>
+    </div>
+</div>
+{% endif %}
 
 <!-- Data Points List -->
 <div class="section">
@@ -52,7 +79,7 @@
     {% if data_points %}
     <div class="data-points-list" id="data-points-list">
         {% for dp in data_points %}
-        <div class="data-point-card" data-dataset="{{ dp.dataset_id }}" id="dp-{{ dp.id }}">
+        <div class="data-point-card" data-dataset="{{ dp.dataset_id }}" data-exported="{{ dp.exported_from|default('', true) }}" id="dp-{{ dp.id }}">
             <div class="dp-header" onclick="toggleDataPoint(this)">
                 <div class="dp-title">
                     <span class="expand-icon">+</span>
@@ -183,6 +210,37 @@
         <div class="modal-footer">
             <button class="btn" onclick="hideEditDatasetModal()">Cancel</button>
             <button class="btn success" onclick="updateDataset()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Merge Dataset Modal -->
+<div id="merge-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Merge Dataset Into <span id="merge-target-name"></span></h3>
+            <button class="close-btn" onclick="hideMergeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="merge-source">Source Dataset</label>
+                <select id="merge-source">
+                    {% for dataset in datasets %}
+                    <option value="{{ dataset.id }}">{{ dataset.name }}</option>
+                    {% endfor %}
+                </select>
+                <span class="form-hint">All data points from this dataset will be moved into the selected dataset</span>
+            </div>
+            <div class="form-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="merge-delete-source">
+                    <span class="toggle-text">Delete source dataset after merge</span>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="hideMergeModal()">Cancel</button>
+            <button class="btn success" onclick="mergeDatasets()">Merge</button>
         </div>
     </div>
 </div>
@@ -400,6 +458,109 @@ async function deleteDataPoint(dpId) {
     }
 }
 
+// Batch move
+async function batchMove() {
+    const filterEl = document.getElementById('batch-filter');
+    const targetEl = document.getElementById('batch-target');
+    const filter = filterEl.value;
+    const targetId = targetEl.value;
+    const targetName = targetEl.options[targetEl.selectedIndex].text;
+
+    if (!targetId) {
+        alert('Please select a target dataset.');
+        return;
+    }
+
+    const body = { target_dataset_id: targetId };
+
+    if (filter === 'visible') {
+        // Collect IDs of all currently visible cards
+        const visibleIds = [];
+        document.querySelectorAll('.data-point-card').forEach(card => {
+            if (card.style.display !== 'none') {
+                visibleIds.push(card.id.replace('dp-', ''));
+            }
+        });
+        if (visibleIds.length === 0) {
+            alert('No visible data points to move.');
+            return;
+        }
+        body.data_point_ids = visibleIds;
+        if (!confirm(`Move ${visibleIds.length} visible data points to "${targetName}"?`)) return;
+    } else if (filter === 'unassigned') {
+        body.filter = 'unassigned';
+        if (!confirm(`Move all unassigned data points to "${targetName}"?`)) return;
+    } else {
+        body.filter = filter;
+        const label = filterEl.options[filterEl.selectedIndex].text;
+        if (!confirm(`Move ${label} to "${targetName}"?`)) return;
+    }
+
+    try {
+        const response = await fetch('/api/training-data/batch-move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (data.success) {
+            alert(`Moved ${data.moved} data points.`);
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+function updateBatchCount() {
+    // No-op for now, counts are in the option labels
+}
+
+// Merge datasets
+function showMergeModal() {
+    if (!selectedDatasetId) return;
+    const dataset = datasets.find(d => d.id === selectedDatasetId);
+    document.getElementById('merge-target-name').textContent = dataset ? dataset.name : '';
+    // Hide the target dataset from source options
+    const sourceSelect = document.getElementById('merge-source');
+    Array.from(sourceSelect.options).forEach(opt => {
+        opt.style.display = opt.value === selectedDatasetId ? 'none' : '';
+    });
+    document.getElementById('merge-modal').style.display = 'flex';
+}
+
+function hideMergeModal() {
+    document.getElementById('merge-modal').style.display = 'none';
+}
+
+async function mergeDatasets() {
+    const sourceId = document.getElementById('merge-source').value;
+    const deleteSource = document.getElementById('merge-delete-source').checked;
+    const sourceName = document.getElementById('merge-source').options[document.getElementById('merge-source').selectedIndex].text;
+    const targetName = document.getElementById('merge-target-name').textContent;
+
+    if (!confirm(`Merge all data points from "${sourceName}" into "${targetName}"?${deleteSource ? ' The source dataset will be deleted.' : ''}`)) return;
+
+    try {
+        const response = await fetch(`/api/datasets/${selectedDatasetId}/merge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_dataset_id: sourceId, delete_source: deleteSource })
+        });
+        const data = await response.json();
+        if (data.success) {
+            alert(`Merged ${data.moved} data points.`);
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
 // Initialize count
 document.addEventListener('DOMContentLoaded', function() {
     const count = document.querySelectorAll('.data-point-card').length;
@@ -408,6 +569,32 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+.batch-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f0f4ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.batch-actions-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.batch-select {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #c7d2fe;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    max-width: 220px;
+}
+
 .dataset-section {
     margin-bottom: 1.5rem;
 }

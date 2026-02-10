@@ -2623,11 +2623,59 @@ def training_data_page():
     """Training Data page."""
     datasets_data = load_training_datasets()
     training_data = load_training_data()
+
+    # Normalize data points to the nested format the template expects
+    data_points = training_data.get("data_points", [])
+
+    # Build scenario lookup for populating messages
+    bank = load_scenario_bank()
+    scenario_lookup = {s["id"]: s for s in bank.get("scenarios", [])}
+
+    needs_save = False
+    for dp in data_points:
+        if "scenario" not in dp and "scenario_name" in dp:
+            scenario_id = dp.get("scenario_id", "")
+            bank_scenario = scenario_lookup.get(scenario_id, {})
+            dp["scenario"] = {
+                "name": dp.get("scenario_name", "Unknown"),
+                "id": scenario_id,
+                "messages": bank_scenario.get("messages", [])
+            }
+            needs_save = True
+        elif "scenario" in dp and not dp["scenario"].get("messages"):
+            # Existing scenario obj but missing messages — look them up
+            scenario_id = dp["scenario"].get("id", "")
+            bank_scenario = scenario_lookup.get(scenario_id, {})
+            dp["scenario"]["messages"] = bank_scenario.get("messages", [])
+            needs_save = True
+        if "default_response" not in dp and "default" in dp:
+            dp["default_response"] = dp["default"]
+            needs_save = True
+        if "steered_response" not in dp and "steered" in dp:
+            dp["steered_response"] = dp["steered"]
+            needs_save = True
+        if "id" not in dp:
+            dp["id"] = generate_id("dp")
+            needs_save = True
+        if "dataset_id" not in dp:
+            dp["dataset_id"] = ""
+            needs_save = True
+
+    # Persist normalization so API endpoints see consistent data
+    if needs_save:
+        save_training_data(training_data)
+
+    # Compute export batch groups for batch move UI
+    from collections import Counter
+    export_batches = Counter(dp.get("exported_from", "") for dp in data_points if dp.get("exported_from"))
+    export_batch_list = [{"id": k, "count": v} for k, v in export_batches.most_common()]
+
     return render_template(
         "training_data.html",
         datasets=datasets_data.get("datasets", []),
         default_dataset_id=datasets_data.get("default_dataset_id"),
-        data_points=training_data.get("data_points", [])
+        data_points=data_points,
+        export_batches=export_batch_list
     )
 
 
@@ -2852,6 +2900,93 @@ def api_training_data_move(data_point_id):
             return jsonify({"success": True, "data_point": dp})
 
     return jsonify({"error": "Data point not found"}), 404
+
+
+@app.route("/api/training-data/batch-move", methods=["POST"])
+def api_training_data_batch_move():
+    """Move multiple data points to a dataset at once."""
+    data = request.json or {}
+    target_dataset_id = data.get("target_dataset_id")
+    data_point_ids = data.get("data_point_ids")  # Explicit list of IDs
+    filter_mode = data.get("filter")  # "unassigned", "exported_from:<id>", "dataset:<id>"
+
+    if not target_dataset_id:
+        return jsonify({"error": "target_dataset_id is required"}), 400
+
+    datasets_data = load_training_datasets()
+    if not any(d["id"] == target_dataset_id for d in datasets_data["datasets"]):
+        return jsonify({"error": "Target dataset not found"}), 404
+
+    training_data = load_training_data()
+    moved = 0
+
+    for dp in training_data["data_points"]:
+        should_move = False
+        if data_point_ids:
+            should_move = dp.get("id") in data_point_ids
+        elif filter_mode == "unassigned":
+            should_move = not dp.get("dataset_id")
+        elif filter_mode and filter_mode.startswith("exported_from:"):
+            export_id = filter_mode.split(":", 1)[1]
+            should_move = dp.get("exported_from") == export_id
+        elif filter_mode and filter_mode.startswith("dataset:"):
+            ds_id = filter_mode.split(":", 1)[1]
+            should_move = dp.get("dataset_id") == ds_id
+
+        if should_move and dp.get("dataset_id") != target_dataset_id:
+            dp["dataset_id"] = target_dataset_id
+            moved += 1
+
+    if moved:
+        save_training_data(training_data)
+        for dataset in datasets_data["datasets"]:
+            if dataset["id"] == target_dataset_id:
+                dataset["updated_at"] = datetime.now().isoformat()
+        save_training_datasets(datasets_data)
+
+    return jsonify({"success": True, "moved": moved})
+
+
+@app.route("/api/datasets/<dataset_id>/merge", methods=["POST"])
+def api_datasets_merge(dataset_id):
+    """Merge another dataset's data points into this one."""
+    data = request.json or {}
+    source_dataset_id = data.get("source_dataset_id")
+    delete_source = data.get("delete_source", False)
+
+    if not source_dataset_id:
+        return jsonify({"error": "source_dataset_id is required"}), 400
+
+    datasets_data = load_training_datasets()
+    target = None
+    source = None
+    for d in datasets_data["datasets"]:
+        if d["id"] == dataset_id:
+            target = d
+        if d["id"] == source_dataset_id:
+            source = d
+
+    if not target:
+        return jsonify({"error": "Target dataset not found"}), 404
+    if not source:
+        return jsonify({"error": "Source dataset not found"}), 404
+
+    training_data = load_training_data()
+    moved = 0
+    for dp in training_data["data_points"]:
+        if dp.get("dataset_id") == source_dataset_id:
+            dp["dataset_id"] = dataset_id
+            moved += 1
+
+    if moved:
+        save_training_data(training_data)
+        target["updated_at"] = datetime.now().isoformat()
+
+    if delete_source:
+        datasets_data["datasets"] = [d for d in datasets_data["datasets"] if d["id"] != source_dataset_id]
+
+    save_training_datasets(datasets_data)
+    return jsonify({"success": True, "moved": moved, "source_deleted": delete_source})
 
 
 @app.route("/api/datasets/<dataset_id>/export")
@@ -3212,6 +3347,10 @@ def api_export_steering_results(run_id):
     if min_classification == "partial":
         acceptable.add("partial")
 
+    # Build scenario lookup for messages
+    bank = load_scenario_bank()
+    scenario_lookup = {s["id"]: s for s in bank.get("scenarios", [])}
+
     exported = []
     for feat_result in run.get("results", []):
         feature = feat_result["feature"]
@@ -3219,17 +3358,25 @@ def api_export_steering_results(run_id):
             for sr in scenario_results:
                 eval_data = sr.get("evaluation")
                 if eval_data and eval_data.get("classification") in acceptable:
+                    scenario_id = sr.get("scenario_id", "")
+                    bank_scenario = scenario_lookup.get(scenario_id, {})
                     exported.append({
-                        "scenario_name": sr["scenario_name"],
-                        "scenario_id": sr.get("scenario_id", ""),
-                        "default": sr["default"],
-                        "steered": sr["steered"],
+                        "id": generate_id("dp"),
+                        "dataset_id": "",
+                        "scenario": {
+                            "name": sr["scenario_name"],
+                            "id": scenario_id,
+                            "messages": bank_scenario.get("messages", [])
+                        },
+                        "default_response": sr["default"],
+                        "steered_response": sr["steered"],
                         "feature": feature,
                         "strength": int(strength_key),
                         "classification": eval_data["classification"],
                         "confidence": eval_data.get("confidence", 0),
                         "exported_from": run_id,
-                        "exported_at": datetime.now().isoformat()
+                        "exported_at": datetime.now().isoformat(),
+                        "notes": ""
                     })
 
     if not exported:
@@ -3241,9 +3388,16 @@ def api_export_steering_results(run_id):
         with open(training_file, 'r') as f:
             training_data = json.load(f)
     else:
-        training_data = {"items": []}
+        training_data = {"data_points": []}
 
-    training_data["items"].extend(exported)
+    # Support both "items" and "data_points" keys for backwards compatibility
+    if "items" in training_data:
+        training_data["items"].extend(exported)
+    elif "data_points" in training_data:
+        training_data["data_points"].extend(exported)
+    else:
+        training_data["data_points"] = exported
+
     with open(training_file, 'w') as f:
         json.dump(training_data, f, indent=2)
 
