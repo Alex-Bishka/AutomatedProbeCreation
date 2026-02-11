@@ -25,6 +25,7 @@
                 <!-- Automated Pipeline Section -->
                 <div class="nav-row">
                     <span class="nav-section">Automated</span>
+                    <a href="{{ url_for('guide_page') }}" {% if request.endpoint == 'guide_page' %}class="active"{% endif %}>Guide</a>
                     <a href="{{ url_for('pipeline_page') }}" {% if request.endpoint in ['pipeline_page', 'job_detail_page'] %}class="active"{% endif %}>Pipeline</a>
                     <a href="{{ url_for('review_page') }}" {% if request.endpoint == 'review_page' %}class="active"{% endif %}>Review</a>
                     <a href="{{ url_for('scenario_review_page') }}" {% if request.endpoint == 'scenario_review_page' %}class="active"{% endif %}>Scenario Review</a>

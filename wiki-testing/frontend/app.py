@@ -1309,6 +1309,13 @@ from agents import (
     get_agent_info
 )
 
+# Guide page
+@app.route("/guide")
+def guide_page():
+    """Pipeline guide and overview page."""
+    return render_template("guide.html")
+
+
 # Pipeline page routes
 @app.route("/pipeline")
 def pipeline_page():
