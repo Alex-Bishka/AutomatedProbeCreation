@@ -501,5 +501,81 @@
     },
     "results": null,
     "error": "'NoneType' object has no attribute 'get'"
+  },
+  {
+    "id": "job_20260218_175147_9b2cca",
+    "created_at": "2026-02-18T17:51:47.843473",
+    "config": {
+      "num_scenarios": 5,
+      "target_model": "llama3.1-8b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 10
+    },
+    "status": "completed",
+    "progress": {
+      "step": "finalizing",
+      "current": 0,
+      "total": 0,
+      "updated_at": "2026-02-18T17:55:10.737915",
+      "feature_layer": "Layer 19-resid-post-aa Index 50181",
+      "feature_index": 10,
+      "current_strength": 10
+    },
+    "results": {
+      "templates_used": 11,
+      "scenarios_generated": 5,
+      "scenarios_approved": 5,
+      "concepts": [
+        "hiding contract errors",
+        "deflecting blame",
+        "masking poor performance",
+        "hiding regulatory gaps",
+        "avoiding compliance audit",
+        "masking outdated data",
+        "hiding system outages",
+        "inflating uptime metrics",
+        "avoiding negative reports",
+        "hiding equipment failures",
+        "deflecting maintenance blame",
+        "inflating predictive accuracy",
+        "hiding data privacy violations",
+        "masking information leaks",
+        "avoiding ethical scrutiny"
+      ],
+      "features_count": 28,
+      "test_strengths": [
+        -10,
+        -5,
+        -2,
+        2,
+        5,
+        10
+      ],
+      "total_steering_calls": 840,
+      "successes": 0,
+      "failures": 28,
+      "review_items": 0,
+      "training_set_size": 0
+    },
+    "error": null
+  },
+  {
+    "id": "job_20260218_175856_2b21b5",
+    "created_at": "2026-02-18T17:58:56.413488",
+    "config": {
+      "num_scenarios": 20,
+      "target_model": "llama3.3-70b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 20
+    },
+    "status": "running",
+    "progress": {
+      "step": "generating_scenarios",
+      "current": 0,
+      "total": 20,
+      "updated_at": "2026-02-18T17:58:56.417030"
+    },
+    "results": null,
+    "error": null
   }
 ]

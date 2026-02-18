@@ -674,7 +674,7 @@ class PipelineOrchestrator:
                     "scenario": scenario,
                     "default": "",
                     "steered": "",
-                    "evaluation": None,
+                    "evaluation": {},
                     "error": str(e)
                 })
 
@@ -1131,8 +1131,8 @@ class PipelineOrchestrator:
             )
 
             total = len(mixed_results)
-            incoherent = sum(1 for r in mixed_results if r.get("evaluation", {}).get("coherence_override"))
-            approved = sum(1 for r in mixed_results if r.get("evaluation", {}).get("recommendation") == "include_in_training")
+            incoherent = sum(1 for r in mixed_results if (r.get("evaluation") or {}).get("coherence_override"))
+            approved = sum(1 for r in mixed_results if (r.get("evaluation") or {}).get("recommendation") == "include_in_training")
             incoherent_fraction = (incoherent / total) if total else 1.0
 
             mix_attempts.append({
@@ -1171,7 +1171,7 @@ class PipelineOrchestrator:
             "total": len(mixed_results),
             "approved": sum(
                 1 for r in mixed_results
-                if r.get("evaluation", {}).get("recommendation") == "include_in_training"
+                if (r.get("evaluation") or {}).get("recommendation") == "include_in_training"
             )
         }
         mix_summary["status"] = "success" if mix_summary["approved"] >= mixing_params["min_approved"] else "failure"
