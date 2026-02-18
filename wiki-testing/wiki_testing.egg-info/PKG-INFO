@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: wiki-testing
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: flask>=3.0.0
+Requires-Dist: pandas>=2.3.3
+Requires-Dist: python-dotenv>=1.2.1
+Requires-Dist: requests>=2.31.0
+Requires-Dist: textblob>=0.19.0
+Requires-Dist: wikipedia-api>=0.8.1

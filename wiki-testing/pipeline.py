@@ -332,6 +332,7 @@ def run_steering_experiments_standalone(
                     scenario_results.append({
                         "scenario_name": scenario.get("name", "Unknown"),
                         "scenario_id": scenario.get("id", ""),
+                        "scenario": scenario,
                         "default": default_text,
                         "steered": steered_text,
                         "error": None,
@@ -341,6 +342,7 @@ def run_steering_experiments_standalone(
                     scenario_results.append({
                         "scenario_name": scenario.get("name", "Unknown"),
                         "scenario_id": scenario.get("id", ""),
+                        "scenario": scenario,
                         "default": default_responses_cache.get(scenario_key, ""),
                         "steered": "",
                         "error": str(e),
@@ -647,12 +649,11 @@ class PipelineOrchestrator:
                     default_response=default_text,
                     steered_response=steered_text,
                     features_applied=steering_config
-                )
+                ) or {}  # Ensure evaluation is always a dict, never None
 
                 coherence = self._coherence_metrics(steered_text)
                 is_coherent = self._is_coherent(coherence, coherence_params)
                 if not is_coherent:
-                    evaluation = evaluation or {}
                     evaluation["classification"] = "failure"
                     evaluation["recommendation"] = "exclude"
                     evaluation["review_reason"] = "Incoherent output (automatic filter)"
@@ -1000,7 +1001,7 @@ class PipelineOrchestrator:
                             "index": feature["index"],
                             "strength": strength
                         }]
-                    )
+                    ) or {}  # Ensure evaluation is always a dict, never None
 
                     strength_evals.append({
                         "scenario_name": result["scenario_name"],
@@ -1113,7 +1114,8 @@ class PipelineOrchestrator:
 
             if not mixed_features and mix_candidates:
                 mixed_features = self._fallback_mixed_features(mix_candidates, max_combined_features)
-                mix_result = mix_result or {}
+                if mix_result is None:
+                    mix_result = {}
                 mix_result.setdefault("rationale", "Fallback mix based on single-feature success rates.")
 
             if not mixed_features:
