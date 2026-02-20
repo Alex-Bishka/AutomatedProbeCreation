@@ -62,8 +62,8 @@
       ],
       "max_features_per_concept": 3,
       "num_scenarios": 2,
-      "steering_api_max_retries": 5,
-      "steering_api_base_wait": 2.0
+      "steering_api_max_retries": 7,
+      "steering_api_base_wait": 5.0
     },
     "gemma-2-9b-it": {
       "test_strengths": [
@@ -77,8 +77,8 @@
       ],
       "max_features_per_concept": 3,
       "num_scenarios": 2,
-      "steering_api_max_retries": 5,
-      "steering_api_base_wait": 2.0
+      "steering_api_max_retries": 7,
+      "steering_api_base_wait": 5.0
     }
   },
   "agent_prompt_overrides": {}

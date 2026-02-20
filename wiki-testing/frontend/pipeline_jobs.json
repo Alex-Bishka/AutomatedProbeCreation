@@ -651,5 +651,27 @@
     },
     "results": null,
     "error": null
+  },
+  {
+    "id": "job_20260220_115144_4f5a0d",
+    "created_at": "2026-02-20T11:51:44.585742",
+    "config": {
+      "num_scenarios": 10,
+      "target_model": "llama3.3-70b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 10
+    },
+    "status": "running",
+    "progress": {
+      "step": "steering",
+      "current": 319,
+      "total": 780,
+      "updated_at": "2026-02-20T14:43:10.895300",
+      "feature_layer": "Layer 50-resid-post-gf Index 3094",
+      "feature_index": 15,
+      "current_strength": 15
+    },
+    "results": null,
+    "error": null
   }
 ]
