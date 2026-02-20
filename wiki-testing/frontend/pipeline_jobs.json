@@ -673,5 +673,71 @@
     },
     "results": null,
     "error": null
+  },
+  {
+    "id": "job_20260220_145208_7cc92f",
+    "created_at": "2026-02-20T14:52:08.851346",
+    "config": {
+      "num_scenarios": 5,
+      "target_model": "gemma-2-9b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 10
+    },
+    "status": "running",
+    "progress": {
+      "step": "steering",
+      "current": 34,
+      "total": 680,
+      "updated_at": "2026-02-20T15:01:21.803690",
+      "feature_layer": "Layer 20-gemmascope-res-16k Index 1341",
+      "feature_index": 10,
+      "current_strength": 10
+    },
+    "results": null,
+    "error": null
+  },
+  {
+    "id": "job_20260220_155446_66ae60",
+    "created_at": "2026-02-20T15:54:46.697375",
+    "config": {
+      "num_scenarios": 5,
+      "target_model": "gemma-2-9b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 5
+    },
+    "status": "running",
+    "progress": {
+      "step": "steering",
+      "current": 19,
+      "total": 455,
+      "updated_at": "2026-02-20T15:56:47.740435",
+      "feature_layer": "Layer 20-gemmascope-res-16k Index 3419",
+      "feature_index": -20,
+      "current_strength": -20
+    },
+    "results": null,
+    "error": null
+  },
+  {
+    "id": "job_20260220_155718_075f9e",
+    "created_at": "2026-02-20T15:57:18.769775",
+    "config": {
+      "num_scenarios": 5,
+      "target_model": "llama3.1-8b-it",
+      "high_quality_mode": false,
+      "max_features_per_concept": 5
+    },
+    "status": "running",
+    "progress": {
+      "step": "steering",
+      "current": 256,
+      "total": 450,
+      "updated_at": "2026-02-20T16:24:18.604783",
+      "feature_layer": "Layer 27-resid-post-aa Index 713",
+      "feature_index": 2,
+      "current_strength": 2
+    },
+    "results": null,
+    "error": null
   }
 ]
