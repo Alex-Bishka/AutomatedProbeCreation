@@ -96,7 +96,7 @@ DEFAULT_COLORS = [
 ]
 
 # API Configuration
-API_URL = "https://www.neuronpedia.org/api"
+API_URL = "https://neuronpedia.org/api"
 NEURONPEDIA_API_KEY = os.getenv("NEURONPEDIA_KEY", "")
 
 

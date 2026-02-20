@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-API_URL = "https://www.neuronpedia.org/api"
+API_URL = "https://neuronpedia.org/api"
 NEURONPEDIA_API_KEY = os.getenv("NEURONPEDIA_KEY")
 # MODEL_ID = "gemma-2-9b-it"
 from prompts import chatMessage, feature_set, MODEL_ID

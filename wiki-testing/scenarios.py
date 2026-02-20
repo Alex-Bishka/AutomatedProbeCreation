@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 # Your existing config
-API_URL = "https://www.neuronpedia.org/api"  # or whatever your base URL is
+API_URL = "https://neuronpedia.org/api"
 NEURONPEDIA_API_KEY = "your-api-key-here"
 MODEL_ID = "gemma-2-9b-it"  # or "llama3.1-8b-it"
 

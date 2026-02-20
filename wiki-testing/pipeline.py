@@ -954,12 +954,21 @@ class PipelineOrchestrator:
         logger.info(f"  - Total experiments (direction-filtered, concept-matched): {actual_experiments}")
 
         # Step 5: Run steering experiments (one feature at a time, direction-filtered strengths)
+        # Get model-specific API retry parameters
+        model_specific = pipeline_config.get("model_specific_params", {}).get(target_model, {})
+        steering_max_retries = model_specific.get("steering_api_max_retries", 3)
+        steering_base_wait = model_specific.get("steering_api_base_wait", 1.0)
+        
+        logger.info(f"Step 5: Running steering experiments with retry params: max_retries={steering_max_retries}, base_wait={steering_base_wait}s")
+        
         experiments = self._run_steering_experiments(
             scenarios=approved_scenarios,
             selected_features=selected_features,
             target_model=target_model,
             test_strengths=test_strengths,
-            feature_directions=feature_directions
+            feature_directions=feature_directions,
+            max_retries=steering_max_retries,
+            base_wait=steering_base_wait
         )
 
         results["experiments"] = experiments
