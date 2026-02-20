@@ -37,5 +37,49 @@
     ],
     "max_combined_features": 3
   },
+  "model_specific_params": {
+    "llama3.1-8b-it": {
+      "test_strengths": [
+        -10,
+        -5,
+        -2,
+        2,
+        5,
+        10
+      ],
+      "max_features_per_concept": 3,
+      "num_scenarios": 5
+    },
+    "llama3.3-70b-it": {
+      "test_strengths": [
+        -20,
+        -15,
+        -10,
+        -5,
+        10,
+        15,
+        20
+      ],
+      "max_features_per_concept": 3,
+      "num_scenarios": 2,
+      "steering_api_max_retries": 5,
+      "steering_api_base_wait": 2.0
+    },
+    "gemma-2-9b-it": {
+      "test_strengths": [
+        -20,
+        -15,
+        -10,
+        -5,
+        10,
+        15,
+        20
+      ],
+      "max_features_per_concept": 3,
+      "num_scenarios": 2,
+      "steering_api_max_retries": 5,
+      "steering_api_base_wait": 2.0
+    }
+  },
   "agent_prompt_overrides": {}
 }
