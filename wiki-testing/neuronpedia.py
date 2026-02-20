@@ -1,6 +1,8 @@
 import os
 import json
 import requests
+import time
+import logging
 from dotenv import load_dotenv
 
 
@@ -9,6 +11,8 @@ API_URL = "https://www.neuronpedia.org/api"
 NEURONPEDIA_API_KEY = os.getenv("NEURONPEDIA_KEY")
 # MODEL_ID = "gemma-2-9b-it"
 from prompts import chatMessage, feature_set, MODEL_ID
+
+logger = logging.getLogger(__name__)
 
 
 def search_features(model_id, query, offset=0):
@@ -181,7 +185,23 @@ def top_features_by_token():
     }
     
 
-def steering_chat(chatMessage, feature_set, model=MODEL_ID):
+def steering_chat(chatMessage, feature_set, model=MODEL_ID, max_retries=5, base_wait=1.0):
+    """
+    Call Neuronpedia steering chat API with exponential backoff for rate limiting.
+    
+    Args:
+        chatMessage: Chat messages to send
+        feature_set: Features to apply for steering
+        model: Model ID to use for steering
+        max_retries: Maximum number of retries on 429 errors
+        base_wait: Base wait time in seconds (exponential backoff multiplier)
+    
+    Returns:
+        Tuple of (default_response, steered_response)
+    
+    Raises:
+        requests.HTTPError: If error persists after max retries
+    """
     url = f"{API_URL}/steer-chat"
     
     headers = {
@@ -206,18 +226,46 @@ def steering_chat(chatMessage, feature_set, model=MODEL_ID):
         "steer_method": "SIMPLE_ADDITIVE"
     }
     
-    response = requests.post(url, headers=headers, json=payload)
-    response.raise_for_status()
-    data = response.json()
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
 
-    print(data.keys())
-    print("Default Response:")
-    print(data['DEFAULT']['chatTemplate'])
-    print("--------------------" * 5)
-    print("\nSteered Response:")
-    print(data['STEERED']['chatTemplate'])
+            print(data.keys())
+            print("Default Response:")
+            print(data['DEFAULT']['chatTemplate'])
+            print("--------------------" * 5)
+            print("\nSteered Response:")
+            print(data['STEERED']['chatTemplate'])
 
-    return data['DEFAULT'], data['STEERED']
+            return data['DEFAULT'], data['STEERED']
+        
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                if attempt < max_retries - 1:
+                    wait_time = base_wait * (2 ** attempt)
+                    logger.warning(
+                        f"Rate limited (429). Attempt {attempt + 1}/{max_retries}. "
+                        f"Waiting {wait_time:.1f}s before retry..."
+                    )
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(
+                        f"Rate limited (429) after {max_retries} attempts. "
+                        f"Giving up."
+                    )
+                    raise
+            else:
+                logger.error(f"HTTP error {e.response.status_code}: {e}")
+                raise
+        
+        except Exception as e:
+            logger.error(f"Unexpected error in steering_chat: {e}")
+            raise
+    
+    raise RuntimeError(f"Failed to get steering response after {max_retries} attempts")
 
 def steering_completion(prompt, features, model=MODEL_ID):
     url = f"{API_URL}/steer"

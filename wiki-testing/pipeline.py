@@ -204,7 +204,9 @@ def run_steering_experiments_standalone(
     test_strengths: list[int],
     feature_directions: dict = None,
     progress_callback: callable = None,
-    cancel_check: callable = None
+    cancel_check: callable = None,
+    max_retries: int = 3,
+    base_wait: float = 1.0
 ) -> list[dict]:
     """
     Standalone steering experiment runner. Tests each feature against concept-matched
@@ -218,6 +220,8 @@ def run_steering_experiments_standalone(
         feature_directions: Dict mapping (layer, index) -> {"direction": "positive"|"negative"}
         progress_callback: Called with (current, total, **kwargs) for progress updates
         cancel_check: Callable returning True if the run should be cancelled
+        max_retries: Maximum retries for rate-limited steering API calls
+        base_wait: Base wait time for exponential backoff (in seconds)
 
     Returns:
         List of experiment results, one per feature
@@ -321,10 +325,12 @@ def run_steering_experiments_standalone(
                 try:
                     if scenario_key in default_responses_cache:
                         default_text = default_responses_cache[scenario_key]
-                        _, steered_resp = steering_chat(messages, steering_config, model=target_model)
+                        _, steered_resp = steering_chat(messages, steering_config, model=target_model, 
+                                                       max_retries=max_retries, base_wait=base_wait)
                         steered_text = extract_response(steered_resp)
                     else:
-                        default_resp, steered_resp = steering_chat(messages, steering_config, model=target_model)
+                        default_resp, steered_resp = steering_chat(messages, steering_config, model=target_model,
+                                                                  max_retries=max_retries, base_wait=base_wait)
                         default_text = extract_response(default_resp)
                         steered_text = extract_response(steered_resp)
                         default_responses_cache[scenario_key] = default_text
@@ -422,7 +428,9 @@ class PipelineOrchestrator:
         selected_features: list[dict],
         target_model: str,
         test_strengths: list[int],
-        feature_directions: dict = None
+        feature_directions: dict = None,
+        max_retries: int = 3,
+        base_wait: float = 1.0
     ) -> list[dict]:
         """Thin wrapper around standalone function with pipeline job status updates."""
         def progress_callback(current, total, **kwargs):
@@ -440,7 +448,9 @@ class PipelineOrchestrator:
             target_model=target_model,
             test_strengths=test_strengths,
             feature_directions=feature_directions,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            max_retries=max_retries,
+            base_wait=base_wait
         )
 
     def _coherence_metrics(self, text: str) -> dict:
@@ -885,8 +895,12 @@ class PipelineOrchestrator:
             logger.error("No features selected for steering")
             raise ValueError("No features selected for steering")
 
-        # Load test strengths from config
-        test_strengths = pipeline_config.get("steering_params", {}).get("test_strengths", [2, 5, 10])
+        # Load test strengths from config with model-specific overrides
+        model_specific = pipeline_config.get("model_specific_params", {}).get(target_model, {})
+        test_strengths = model_specific.get("test_strengths") or \
+                        pipeline_config.get("steering_params", {}).get("test_strengths", [2, 5, 10])
+        
+        logger.info(f"Step 4.4: Using test strengths for {target_model}: {test_strengths}")
 
         # Step 4.5: Determine steering direction for each feature
         logger.info(f"Step 4.5: Determining steering direction for each feature")
